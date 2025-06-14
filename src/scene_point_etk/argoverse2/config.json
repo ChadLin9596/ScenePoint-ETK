@@ -1,0 +1,5 @@
+{
+    "sensor_dataset_root": "<a path to the sensor dataset root>",
+    "change_pcd_dataset_root": "<a path to the change point cloud dataset root>",
+    "patch_dataset_root": "<a path to the patch dataset root>"
+}

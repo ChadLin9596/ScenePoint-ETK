@@ -1,0 +1,8 @@
+**/__pycache__/*
+**/.DS_Store
+*.pyc
+*.pth
+*.pkl
+**/.experiments/*
+*.egg-info/
+**/build/*
