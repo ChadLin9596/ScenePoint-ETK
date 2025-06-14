@@ -82,6 +82,20 @@ def list_cities():
     return sorted(list(data.keys()))
 
 
+def list_cameras():
+    return [
+        "ring_front_center",
+        "ring_front_left",
+        "ring_front_right",
+        "ring_rear_left",
+        "ring_rear_right",
+        "ring_side_left",
+        "ring_side_right",
+        "stereo_front_left",
+        "stereo_front_right",
+    ]
+
+
 def list_sweep_files_by_log_id(log_id):
 
     check_log_id(log_id)

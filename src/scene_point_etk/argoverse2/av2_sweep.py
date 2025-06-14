@@ -1,0 +1,194 @@
+import os
+
+import numpy as np
+import pyarrow.feather as feather
+
+import py_utils.array_data as array_data
+import py_utils.utils as utils
+
+from .av2_basic_tools import (
+    check_log_id,
+    list_sweep_files_by_log_id,
+    get_root_from_log_id,
+    get_poses_by_log_id,
+    ArgoMixin,
+)
+
+
+class Sweep(ArgoMixin, array_data.Array):
+
+    def __init__(self, path, coordinate="map"):
+
+        if coordinate not in ["map", "ego"]:
+            raise ValueError(f"Coordinate {coordinate} not supported")
+
+        path = os.path.realpath(path)
+        if not os.path.exists(path):
+            raise ValueError(f"Path does not exist: {path}")
+
+        # use intensity field (uint8) as
+        N = len(feather.read_feather(path, columns=["intensity"]))
+        super().__init__(N)  # allocate N rows for indexing points
+
+        self._path = path
+        self._coordinate = coordinate
+        self._is_sampled = False
+
+    def __repr__(self):
+
+        N = len(self)
+        coor = self._coordinate
+        return "<Sweep contains %d points on %s coordinate>" % (N, coor)
+
+    def __getitem__(self, key):
+
+        other = super().__getitem__(key)
+        other._is_sampled = True
+        other._coordinate = self._coordinate
+        return other
+
+    def __copy__(self):
+
+        c = self.__class__
+        other = c.__new__(c)
+        other._path = self._path
+        other._coordinate = self._coordinate
+        other._is_sampled = self._is_sampled
+
+        return other
+
+    def __getstate__(self):
+
+        state = {
+            "log_id": self.log_id,
+            "sweep_timestamp": self.sweep_timestamp,
+            "coordinate": self._coordinate,
+            "is_sampled": self._is_sampled,
+        }
+
+        if not self._is_sampled:
+            return state
+
+        state.update(super().__getstate__())
+        return state
+
+    def __setstate__(self, state):
+
+        log_id = state["log_id"]
+        timestamps = str(state["sweep_timestamp"])
+
+        check_log_id(log_id)
+
+        path = get_root_from_log_id(log_id)
+        path = os.path.join(path, "sensors", "lidar", timestamps + ".feather")
+
+        self.__init__(path, coordinate=state["coordinate"])
+        self._is_sampled = state["is_sampled"]
+
+        if self._is_sampled:
+            # re-sampled
+            self._allocate(len(state["index"]))
+            self._data.index = state["index"]
+            self._data["index"] = state["index"]
+
+    def __sub__(self, other):
+
+        if not isinstance(other, Sweep):
+            raise ValueError(f"Cannot subtract {type(other)} from Sweep")
+
+        if self._path != other._path:
+            raise ValueError("Paths do not match")
+
+        # find the points that are not in the other
+        index = np.setdiff1d(self.index, other.index, assume_unique=True)
+        I = np.searchsorted(self.index, index)
+        I = I[self.index[I] == index]
+        return self[I]
+
+    @property
+    def xyz(self):
+
+        if hasattr(self, "_xyz"):
+            return self._xyz
+
+        xyz = feather.read_feather(self._path, columns=["x", "y", "z"])
+        self._xyz = xyz.to_numpy()[self.index]
+        if self._coordinate == "ego":
+            return self._xyz
+
+        poses = get_poses_by_log_id(self.log_id)
+
+        I = np.searchsorted(poses["timestamp"], self.sweep_timestamp)
+        position = poses["xyz"][I]  # (3,)
+        quaternion = poses["q"][I]  # (4,)
+        R = utils.Q_to_R(quaternion)  # (3, 3)
+
+        # it is equivalent to
+        # np.sum(self._xyz[..., None, :] * R, axis=-1) + position
+        # but more efficient
+        self._xyz = self._xyz @ R.T + position
+
+        return self._xyz
+
+    @property
+    def intensity(self):
+
+        if hasattr(self, "_intensity"):
+            return self._intensity
+
+        intensity = feather.read_feather(self._path, columns=["intensity"])
+        self._intensity = intensity.to_numpy().flatten()[self.index]
+        return self._intensity
+
+    @property
+    def laser_number(self):
+
+        if hasattr(self, "_laser_number"):
+            return self._laser_number
+
+        laser_number = feather.read_feather(
+            self._path, columns=["laser_number"]
+        )
+        self._laser_number = laser_number.to_numpy().flatten()[self.index]
+        return self._laser_number
+
+    @property
+    def point_timestamps(self):
+
+        if hasattr(self, "_point_timestamps"):
+            return self._point_timestamps
+
+        point_timestamps = feather.read_feather(
+            self._path, columns=["offset_ns"]
+        )
+        point_timestamps = point_timestamps.to_numpy().flatten()
+        self._point_timestamps = point_timestamps[self.index]
+        return self._point_timestamps
+
+    @property
+    def sweep_timestamp(self):
+
+        name = os.path.basename(self._path)
+        return int(name.split(".")[0])
+
+
+class SweepSequence(ArgoMixin.array_data.Array):
+
+    def __init__(self, log_id):
+
+        check_log_id(log_id)
+
+        path = get_root_from_log_id(log_id)
+        sweep_files = list_sweep_files_by_log_id(log_id)
+
+        super().__init__(len(sweep_files))
+
+        self._path = path
+        self.sweeps = [Sweep(i) for i in sweep_files]
+
+    def __repr__(self):
+        N = len(self)
+        return "<SweepSequence contains %d sweeps for log %s>" % (
+            N,
+            self.log_id,
+        )
