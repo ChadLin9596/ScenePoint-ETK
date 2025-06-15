@@ -172,7 +172,7 @@ class Sweep(ArgoMixin, array_data.Array):
         return int(name.split(".")[0])
 
 
-class SweepSequence(ArgoMixin.array_data.Array):
+class SweepSequence(ArgoMixin, array_data.Array):
 
     def __init__(self, log_id):
 
