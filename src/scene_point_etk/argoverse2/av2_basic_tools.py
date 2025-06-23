@@ -22,21 +22,22 @@ def set_sensor_root(sensor_root=None, overwrite=True):
     global SENSOR_ROOT, SENSOR_MAP
 
     path_this_file = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(path_this_file, "..", "config.json")
 
     # set the SENSOR_ROOT from either config.json or the provided sensor_root
     if sensor_root is not None:
         SENSOR_ROOT = sensor_root
     else:
-        with open(os.path.join(path_this_file, "config.json"), "r") as f:
+        with open(config_path, "r") as f:
             config = json.load(f)
             SENSOR_ROOT = config.get("sensor_dataset_root", "")
 
     # update config.json if overwrite
     if sensor_root is not None and overwrite:
-        with open(os.path.join(path_this_file, "config.json"), "r") as f:
+        with open(config_path, "r") as f:
             config = json.load(f)
 
-        with open(os.path.join(path_this_file, "config.json"), "w") as f:
+        with open(config_path, "w") as f:
             config["sensor_dataset_root"] = SENSOR_ROOT
             json.dump(config, f, indent=4)
 
@@ -271,6 +272,7 @@ def get_ground_height_by_points(log_id, xyz, filled_value=np.nan):
 
 class ArgoMixin:
 
+    # any path under get_root_from_log_id(log_id)
     _path = None
 
     @property
