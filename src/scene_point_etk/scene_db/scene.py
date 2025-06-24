@@ -140,6 +140,8 @@ class Scene:
             raise FileExistsError(f"{path} already exists")
 
         self._camera_sequence = camera_sequence
+        with open(self.camera_sequence_filepath, "wb") as f:
+            pickle.dump(camera_sequence, f)
 
     @property
     def cameras(self):
@@ -195,6 +197,23 @@ class Scene:
             np.save(os.path.join(point_indices_root, name), indices_map)
 
             prog.toc()
+
+    def export(self, output_dir):
+
+        version = os.path.basename(self.scene_root)
+        scene_name = os.path.basename(os.path.dirname(self.scene_root))
+
+        output_root = os.path.join(output_dir, scene_name, version)
+        os.makedirs(output_root, exist_ok=True)
+        os.makedirs(os.path.join(output_root, "cameras"), exist_ok=True)
+
+        shutil.copy(
+            self.details_filepath, os.path.join(output_root, "details.pkl")
+        )
+        shutil.copy(
+            self.camera_sequence_filepath,
+            os.path.join(output_root, "cameras", "cam_sequence.pkl"),
+        )
 
 
 class OriginalScene(Scene):
