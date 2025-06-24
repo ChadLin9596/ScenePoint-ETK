@@ -82,6 +82,7 @@ class Sweep(ArgoMixin, array_data.Array):
             return state
 
         state.update(super().__getstate__())
+        state["index"] = state["index"].astype(np.uint32)
         return state
 
     def __setstate__(self, state):
