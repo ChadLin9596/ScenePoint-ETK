@@ -21,4 +21,4 @@ city origin
 from .av2_basic_tools import *
 from .av2_annotations import Annotations
 from .av2_image_sequence import ImageSequence, CameraSequence
-from .av2_sweep import Sweep
+from .av2_sweep import Sweep, SweepSequence

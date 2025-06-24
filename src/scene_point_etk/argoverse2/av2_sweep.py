@@ -1,5 +1,5 @@
+import copy
 import os
-
 import numpy as np
 import pyarrow.feather as feather
 
@@ -13,6 +13,7 @@ from .av2_basic_tools import (
     get_poses_by_log_id,
     ArgoMixin,
 )
+from .av2_annotations import Annotations
 
 
 class Sweep(ArgoMixin, array_data.Array):
@@ -174,7 +175,7 @@ class Sweep(ArgoMixin, array_data.Array):
 
 class SweepSequence(ArgoMixin, array_data.Array):
 
-    def __init__(self, log_id):
+    def __init__(self, log_id, coordinate="map"):
 
         check_log_id(log_id)
 
@@ -184,11 +185,113 @@ class SweepSequence(ArgoMixin, array_data.Array):
         super().__init__(len(sweep_files))
 
         self._path = path
-        self.sweeps = [Sweep(i) for i in sweep_files]
+        self.sweeps = [Sweep(i, coordinate) for i in sweep_files]
+        self.coordinate = coordinate
 
     def __repr__(self):
+
         N = len(self)
-        return "<SweepSequence contains %d sweeps for log %s>" % (
-            N,
-            self.log_id,
-        )
+        return f"<SweepSequence contains {N} sweeps for log {self.log_id}>"
+
+    def __sub__(self, other):
+
+        if not isinstance(other, SweepSequence):
+            raise ValueError(
+                f"Cannot subtract {type(other)} from SweepSequence"
+            )
+
+        if self._path != other._path:
+            raise ValueError("Paths do not match")
+
+        if len(self.sweeps) != len(other.sweeps):
+            raise ValueError("Cannot subtract sequences of different lengths")
+
+        sweeps = []
+        for i, j in zip(self.sweeps, other.sweeps):
+            if i._path != j._path:
+                raise ValueError("Sweep paths do not match")
+
+            # subtract the sweeps
+            sweep = i - j
+            sweeps.append(sweep)
+
+        other = copy.copy(self)
+        other._path = self._path
+        other.sweeps = sweeps
+        other.coordinate = self.coordinate
+
+        return other
+
+    def filtered_by_annotations(
+        self,
+        annotations,
+        bbox_margin=0.5,
+        time_margin=1.05,
+        verbose=True,
+        prefix="",
+    ):
+
+        if isinstance(annotations, Annotations):
+            annotations = [annotations]
+
+        for a in annotations:
+            if isinstance(a, Annotations):
+                continue
+            raise ValueError(f"Expect Annotations, got {type(a)}")
+
+        # convert seconds to nanoseconds
+        time_margin = time_margin * 1e9
+
+        prog = utils.ProgressTimer(prefix=prefix, verbose=verbose)
+        prog.tic(sum([len(s) for s in self.sweeps]))
+
+        sweeps = []
+        for sweep in self.sweeps:
+
+            results = np.zeros(len(sweep), dtype=bool)
+            for annot in annotations:
+
+                # filter by timestamp
+                T_annot = annot.timestamps
+                T_sweep = sweep.sweep_timestamp
+                T_marg = np.abs(time_margin)
+
+                I = np.abs(T_annot - T_sweep) <= T_marg
+                annot = annot[I]
+                if len(annot) == 0:
+                    continue
+
+                # indices of sweep.xyz
+                I = annot.is_points_in_bounding_boxes(
+                    sweep.xyz, margin=bbox_margin
+                )
+                results[I] = True
+
+            sweeps.append(sweep[results])
+            prog.toc(len(sweep))
+
+        other = copy.copy(self)
+        other._path = self._path
+        other.sweeps = sweeps
+        other.coordinate = self.coordinate
+        return other
+
+    @property
+    def xyz(self):
+        return np.vstack([s.xyz for s in self.sweeps])
+
+    @property
+    def intensity(self):
+        return np.hstack([s.intensity for s in self.sweeps])
+
+    @property
+    def laser_number(self):
+        return np.hstack([s.laser_number for s in self.sweeps])
+
+    @property
+    def point_timestamps(self):
+        return np.hstack([s.point_timestamps for s in self.sweeps])
+
+    @property
+    def sweep_timestamp(self):
+        return [s.sweep_timestamp for s in self.sweeps]
