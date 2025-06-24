@@ -1,0 +1,64 @@
+########################################
+# CONFIGURATION FILE OF MAKING DATASET #
+########################################
+
+dynamic_objects_categories:
+    - ANIMAL
+    - ARTICULATED_BUS
+    - BICYCLE
+    - BICYCLIST
+    - BOX_TRUCK
+    - BUS
+    - DOG
+    - LARGE_VEHICLE
+    - MOTORCYCLE
+    - MOTORCYCLIST
+    - PEDESTRIAN
+    - RAILED_VEHICLE
+    - REGULAR_VEHICLE
+    - SCHOOL_BUS
+    - STROLLER
+    - TRUCK
+    - TRUCK_CAB
+    - TRUCK_CAP
+    - VEHICULAR_TRAILER
+    - WHEELCHAIR
+    - WHEELED_DEVICE
+    - WHEELED_RIDER
+
+bbox_params:
+# bounding boxes parameters
+
+    bbox_margin: 0.5   # meters
+    time_margin: 1.05  # seconds
+
+cluster_params:
+
+    eps: 0.3
+    min_samples: 10
+    min_cluster_size: 80
+
+image_params:
+
+    max_distance: 50  # meters
+    min_pts_num_in_FOV: 400  # points
+
+pcd_params:
+    voxel_size: 0.2  # meters
+
+anchor_params:
+    ground_threshold: 0.1  # meters
+    area_per_point: 40  # 1 anchor per 40 square meters
+    FOV_cameras:
+        - "ring_front_left"
+    FOV_max_distance: 10  # meters
+    FOV_min_distance: 0.  # points
+
+########################
+# develope and testing #
+########################
+
+miscellaneous:
+    dry: False
+    verbose: True
+    overwrite: True
