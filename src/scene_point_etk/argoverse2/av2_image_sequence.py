@@ -265,10 +265,9 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
 
         other._figsize = np.r_[H, W]
         other.is_reshaped = True
-        other._intrinsic = utils_img.update_intrinsics(
+        other._intrinsic = utils_img.update_intrinsics_by_resized(
             self.intrinsic,
             self.figsize,
-            (H, W),
             (H, W),
         )
         return other
@@ -415,6 +414,16 @@ class CameraSequence(ArgoMixin, array_data.Array):
         cameras = []
         for camera in self.cameras:
             camera = camera.resize(H, W)
+            cameras.append(camera)
+
+        other = copy.copy(self)
+        other.cameras = cameras
+        return other
+
+    def align_timestamps(self, timestamps):
+        cameras = []
+        for camera in self.cameras:
+            camera = camera.align_timestamps(timestamps)
             cameras.append(camera)
 
         other = copy.copy(self)

@@ -1,9 +1,11 @@
 import glob
 import json
 import os
+from . import scene
 
 SCENE_ROOT = ""
 SCENE_MAP = {}
+
 
 def set_scene_root(scene_root=None, overwrite=True):
 
@@ -53,4 +55,39 @@ def set_scene_root(scene_root=None, overwrite=True):
             "versions": scene_dirs,
         }
 
+
 set_scene_root()
+
+
+def list_scene_ids():
+    return sorted(list(SCENE_MAP.keys()))
+
+
+def list_versions_by_scene_id(scene_id):
+    if scene_id not in SCENE_MAP:
+        raise ValueError(f"Scene ID '{scene_id}' not found in the scene map.")
+    return sorted(SCENE_MAP[scene_id]["versions"])
+
+
+def get_scene_path_by_id(scene_id):
+    if scene_id not in SCENE_MAP:
+        raise ValueError(f"Scene ID '{scene_id}' not found in the scene map.")
+    return SCENE_MAP[scene_id]["path"]
+
+
+class Scene(scene.Scene):
+
+    def __init__(self, scene_id, version):
+        super().__init__(os.path.join(SCENE_ROOT, scene_id), version)
+
+
+class OriginalScene(scene.OriginalScene):
+
+    def __init__(self, scene_id):
+        super().__init__(os.path.join(SCENE_ROOT, scene_id))
+
+
+class EditedScene(scene.EditedScene):
+
+    def __init__(self, scene_id, version):
+        super().__init__(os.path.join(SCENE_ROOT, scene_id), version)

@@ -54,6 +54,13 @@ anchor_params:
     FOV_max_distance: 10  # meters
     FOV_min_distance: 0.  # points
 
+camera_sequence_params:
+    H: 392
+    W: 518
+    cameras:
+        - "ring_front_left"
+
+
 ########################
 # develope and testing #
 ########################
@@ -62,3 +69,5 @@ miscellaneous:
     dry: False
     verbose: True
     overwrite: True
+
+selective_logids:
