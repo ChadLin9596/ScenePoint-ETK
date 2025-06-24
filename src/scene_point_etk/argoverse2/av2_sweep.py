@@ -5,6 +5,7 @@ import pyarrow.feather as feather
 
 import py_utils.array_data as array_data
 import py_utils.utils as utils
+import py_utils.voxel_grid as voxel_grid
 
 from .av2_basic_tools import (
     check_log_id,
@@ -14,6 +15,16 @@ from .av2_basic_tools import (
     ArgoMixin,
 )
 from .av2_annotations import Annotations
+
+CLOUD_COMPARE_DTYPE = [
+    ("x", np.float32),
+    ("y", np.float32),
+    ("z", np.float32),
+    ("rgb", np.float32),
+    ("center", np.float64, 3),
+    ("count", np.int64),
+    ("intensity", np.uint8),
+]
 
 
 class Sweep(ArgoMixin, array_data.Array):
@@ -222,6 +233,23 @@ class SweepSequence(ArgoMixin, array_data.Array):
 
         return other
 
+    @staticmethod
+    def from_sweeps(sweeps):
+
+        if not isinstance(sweeps, list):
+            sweeps = [sweeps]
+
+        for i, s in enumerate(sweeps):
+            if not isinstance(s, Sweep):
+                raise ValueError(f"Expect Sweep, got {type(s)} at index {i}")
+
+        log_id = sweeps[0].log_id
+        coordinate = sweeps[0]._coordinate
+
+        seq = SweepSequence(log_id=log_id, coordinate=coordinate)
+        seq.sweeps = sweeps
+        return seq
+
     def filtered_by_annotations(
         self,
         annotations,
@@ -295,3 +323,29 @@ class SweepSequence(ArgoMixin, array_data.Array):
     @property
     def sweep_timestamp(self):
         return [s.sweep_timestamp for s in self.sweeps]
+
+    def export_to_voxel_grid(self, voxel_size=0.2, return_details=False):
+
+        vg = voxel_grid.VoxelGrid(
+            self.xyz,
+            voxel_size=voxel_size,
+            attributes=[self.intensity],
+        )
+
+        details = {
+            "splits": vg._splits,
+            "indices": vg._to_point_indices,
+            "voxel_index": vg._sorted_voxel_index,
+        }
+
+        X = np.zeros(len(vg), dtype=np.dtype(CLOUD_COMPARE_DTYPE))
+        X["x"] = vg.voxel_centroids[:, 0]
+        X["y"] = vg.voxel_centroids[:, 1]
+        X["z"] = vg.voxel_centroids[:, 2]
+        X["center"] = vg.voxel_centers
+        X["count"] = vg.voxel_counts
+        X["intensity"] = vg.voxel_attributes[0]
+
+        if return_details:
+            return X, details
+        return X

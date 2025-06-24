@@ -1,1 +1,1 @@
-from .vis_pptk import plot_mulitple_pcds
+from .vis_pptk import plot_mulitple_pcds, plot_multiple_pcds_with_bboxes
