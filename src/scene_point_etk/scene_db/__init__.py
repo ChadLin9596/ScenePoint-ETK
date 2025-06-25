@@ -2,6 +2,11 @@ import glob
 import json
 import os
 from . import scene
+from .diff_scene import (
+    get_deleted_pcd,
+    get_added_pcd,
+    apply_change_info_to_target_pcd,
+)
 
 SCENE_ROOT = ""
 SCENE_MAP = {}

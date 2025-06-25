@@ -47,7 +47,7 @@ pcd_params:
     voxel_size: 0.2  # meters
 
 anchor_params:
-    ground_threshold: 0.1  # meters
+    ground_offset: 0.1  # meters
     area_per_point: 40  # 1 anchor per 40 square meters
     FOV_cameras:
         - "ring_front_left"
@@ -60,6 +60,7 @@ camera_sequence_params:
     cameras:
         - "ring_front_left"
 
+edit_scene_prefix: "v0."
 
 ########################
 # develope and testing #

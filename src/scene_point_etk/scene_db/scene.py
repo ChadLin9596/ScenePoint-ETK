@@ -41,6 +41,7 @@ class Scene:
 
     def __init__(self, scene_root, version):
 
+        self.root = scene_root
         self.scene_root = os.path.join(scene_root, version)
         self.version = version
         self.cameras_root = os.path.join(self.scene_root, "cameras")
@@ -318,9 +319,7 @@ class EditedScene(Scene):
 
     @property
     def camera_sequence_filepath(self):
-        return os.path.join(
-            self.scene_root, "GT", "cameras", "cam_sequence.pkl"
-        )
+        return os.path.join(self.root, "GT", "cameras", "cam_sequence.pkl")
 
     def process_camera(self, camera_name):
 

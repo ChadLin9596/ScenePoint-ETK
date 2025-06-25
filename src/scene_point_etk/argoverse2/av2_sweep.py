@@ -22,7 +22,6 @@ CLOUD_COMPARE_DTYPE = [
     ("z", np.float32),
     ("rgb", np.float32),
     ("center", np.float64, 3),
-    ("indices", np.int64, 3),
     ("count", np.int64),
     ("intensity", np.uint8),
 ]
@@ -345,7 +344,6 @@ class SweepSequence(ArgoMixin, array_data.Array):
         X["y"] = vg.voxel_centroids[:, 1]
         X["z"] = vg.voxel_centroids[:, 2]
         X["center"] = vg.voxel_centers
-        X["indices"] = vg.voxel_indices
         X["count"] = vg.voxel_counts
         X["intensity"] = vg.voxel_attributes[0]
 

@@ -4,7 +4,7 @@ import pptk
 import py_utils.visualization_pptk as visualization_pptk
 
 
-def plot_mulitple_pcds(*pcds, scale=[0, 100], color_map=None):
+def plot_multiple_pcds(*pcds, scale=[0, 100], color_map=None):
     """
     TODO: add docstring
     """
@@ -58,7 +58,7 @@ def plot_multiple_pcds_with_bboxes(
 ):
 
     if bboxes is None:
-        return plot_mulitple_pcds(*pcds, scale=scale, color_map=color_map)
+        return plot_multiple_pcds(*pcds, scale=scale, color_map=color_map)
 
     if scale is not None and len(scale) != 2:
         raise ValueError("scale must be a tuple of two floats")
