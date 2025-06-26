@@ -145,7 +145,7 @@ def main(args):
         if delete_scene_name in existing_versions and not _overwrite:
 
             delete_info = scene_db.EditedScene(log_id, delete_scene_name)
-            delete_info = delete_info.scene_details
+            delete_info = delete_info.scene_details["delete"]
 
         else:
 
@@ -159,7 +159,7 @@ def main(args):
         if add_scene_name in existing_versions and not _overwrite:
 
             add_info = scene_db.EditedScene(log_id, add_scene_name)
-            add_info = add_info.scene_details
+            add_info = add_info.scene_details["add"]
 
         else:
 
@@ -190,7 +190,9 @@ def main(args):
                 scene_delete.scene_details,
             )
 
-        if _overwrite or add_scene_name not in existing_versions:
+        valid_add = len(add_info["patches"]) > 0
+        do_add = _overwrite or add_scene_name not in existing_versions
+        if valid_add and do_add:
 
             scene_add = scene_db.EditedScene(log_id, add_scene_name)
             scene_add.scene_details = {
@@ -207,7 +209,7 @@ def main(args):
         # exact same as `add`, thus skipping
         overall_scene_name = args["edit_scene_prefix"] + "overall"
         do_overall = _overwrite or overall_scene_name not in existing_versions
-        if valid_delete and do_overall:
+        if valid_delete and valid_add and do_overall:
 
             scene_overall = scene_db.EditedScene(log_id, overall_scene_name)
             scene_overall.scene_details = {
