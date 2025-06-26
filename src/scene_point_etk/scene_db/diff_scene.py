@@ -57,6 +57,8 @@ def get_deleted_pcd(scene_pcd, delete_info, return_mask=False):
 def get_added_pcd(scene_pcd, add_info, return_splits=False):
 
     if len(add_info) == 0:
+        if return_splits:
+            return np.empty(0, dtype=np.dtype(CLOUD_COMPARE_DTYPE)), []
         return np.empty(0, dtype=np.dtype(CLOUD_COMPARE_DTYPE))
 
     # extract information from add_info
@@ -127,7 +129,7 @@ def apply_change_info_to_target_pcd(
     updated_pcd = np.concatenate([target_pcd, additional_pcd])
 
     s = np.r_[0, split, len(additional_pcd)]
-    segment_info = np.repeat(np.arange(len(s) - 1), np.diff(s))
+    segment_info = np.repeat(np.arange(len(s) - 1), np.diff(s).astype(np.int64))
     segment_info = np.r_[np.ones(len(target_pcd)) * -1, segment_info]
 
     # re-sort again, but does not need to re-voxelize

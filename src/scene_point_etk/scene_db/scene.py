@@ -14,28 +14,42 @@ import py_utils.utils_img as utils_img
 import py_utils.visualization_pptk as vis_pptk
 
 
-class Scene:
+def _cluster_overlapping_lists(lists_of_indices):
+    parent = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        if parent[x] != x:
+            parent[x] = find(parent[x])
+        return parent[x]
+
+    def union(x, y):
+        parent[find(x)] = find(y)
+
+    # Step 1: Union all overlapping values
+    for group in lists_of_indices:
+        for i in range(1, len(group)):
+            union(group[i - 1], group[i])
+
+    # Step 2: Group by root
+    clusters = {}
+    for group in lists_of_indices:
+        for item in group:
+            root = find(item)
+            if root not in clusters:
+                clusters[root] = set()
+            clusters[root].add(item)
+
+    return list(clusters.values())
+
+
+class PCDScene:
     """
     ├── <Scene ID 00>
     │   │
     │   └── <version name>
     │       ├── details.pkl
-    │       ├── scene.pcd
-    │       └── cameras
-    │           ├── cam_sequence.pkl
-    │           ├── <camera name 1>
-    │           │   ├── sparse_depths
-    │           │   │   ├── <depth 1>.npy
-    │           │   │   └── ...
-    │           │   ├── sparse_point_map
-    │           │   │   ├── <point map 1>.npy
-    │           │   │   └── ...
-    │           │   └── sparse_point_indices
-    │           │       ├── <point indices 1>.npy
-    │           │       └── ...
-    │           │
-    │           ├── <camera name 2>
-    │           └── ...
+    │       └── scene.pcd
     │
     ├── <Scene ID 01>
     └── ...
@@ -46,8 +60,8 @@ class Scene:
         self.root = scene_root
         self.scene_root = os.path.join(scene_root, version)
         self.version = version
-        self.cameras_root = os.path.join(self.scene_root, "cameras")
-        os.makedirs(self.cameras_root, exist_ok=True)
+
+        os.makedirs(self.scene_root, exist_ok=True)
 
     @property
     def scene_filepath(self):
@@ -56,10 +70,6 @@ class Scene:
     @property
     def details_filepath(self):
         return os.path.join(self.scene_root, "details.pkl")
-
-    @property
-    def camera_sequence_filepath(self):
-        return os.path.join(self.cameras_root, "cam_sequence.pkl")
 
     @property
     def scene_pcd(self):
@@ -114,6 +124,43 @@ class Scene:
     def scene_details(self, details):
         with open(self.details_filepath, "wb") as fd:
             pickle.dump(details, fd)
+
+
+class Scene(PCDScene):
+    """
+    ├── <Scene ID 00>
+    │   │
+    │   └── <version name>
+    │       └── cameras
+    │           ├── cam_sequence.pkl
+    │           ├── <camera name 1>
+    │           │   ├── sparse_depths
+    │           │   │   ├── <depth 1>.npy
+    │           │   │   └── ...
+    │           │   ├── sparse_point_map
+    │           │   │   ├── <point map 1>.npy
+    │           │   │   └── ...
+    │           │   └── sparse_point_indices
+    │           │       ├── <point indices 1>.npy
+    │           │       └── ...
+    │           │
+    │           ├── <camera name 2>
+    │           └── ...
+    │
+    ├── <Scene ID 01>
+    └── ...
+    """
+
+    def __init__(self, scene_root, version):
+
+        super().__init__(scene_root, version)
+
+        self.cameras_root = os.path.join(self.scene_root, "cameras")
+        os.makedirs(self.cameras_root, exist_ok=True)
+
+    @property
+    def camera_sequence_filepath(self):
+        return os.path.join(self.cameras_root, "cam_sequence.pkl")
 
     @property
     def camera_sequence(self):
@@ -524,6 +571,121 @@ class EditedScene(Scene):
 
         os.makedirs(sparse_cd_mask_tgt_root, exist_ok=True)
         os.makedirs(dense_cd_mask_tgt_root, exist_ok=True)
+
+        ori_scene = OriginalScene(self.root)
+        tgt_inds = self.edited_details["deleted_indices_of_target"]
+        deleted_xyz = ori_scene.pcd_xyz[tgt_inds]
+        deleted_ann = self.scene_details["delete"].get("annotations", None)
+        margin = self.scene_details["delete"].get("margin", 0.0)
+
+        deleted_inds = []
+        if deleted_ann is not None:
+            results = deleted_ann.is_points_in_bounding_boxes(
+                deleted_xyz,
+                margin=margin,
+                separate=True,
+            )
+            for indices in results:
+                deleted_inds.append(tgt_inds[indices])
+
+        deleted_inds = _cluster_overlapping_lists(deleted_inds)
+        deleted_inds = [np.sort(list(ind)) for ind in deleted_inds]
+
+        image_sequence = self.camera_sequence.get_a_camera(camera_name)
+        for index in range(len(image_sequence)):
+
+            name = self._initialize_cam_fnames(camera_name, index)
+            ind_map_tgt = ori_scene.get_a_sparse_point_indices(camera_name, index)
+            valid_tgt = ind_map_tgt > 0
+
+            sparse_change_mask = np.zeros_like(ind_map_tgt, dtype=bool)
+            dense_change_mask = np.zeros_like(ind_map_tgt, dtype=bool)
+
+            for indices in deleted_inds:
+                # compare indices and ind_map_src
+                sparse_mask = np.zeros_like(ind_map_tgt, dtype=bool)
+                valid = np.isin(ind_map_tgt[valid_tgt], indices)
+
+                sparse_mask[valid_tgt] |= valid
+                dense_mask = utils_img.fill_sparse_boolean_by_convex_hull(sparse_mask)
+
+                sparse_change_mask |= sparse_mask
+                dense_change_mask |= dense_mask > 0
+
+            file = f"{name}.png"
+            f_sparse_mask = os.path.join(sparse_cd_mask_tgt_root, file)
+            f_dense_mask = os.path.join(dense_cd_mask_tgt_root, file)
+            plt.imsave(f_sparse_mask, sparse_change_mask, cmap="gray")
+            plt.imsave(f_dense_mask, dense_change_mask, cmap="gray")
+
+    def process_visual_target_masks(self, camera_name):
+
+        ori_scene = OriginalScene(self.root)
+
+        # for debug
+        camera_root = os.path.join(self.cameras_root, camera_name)
+        sparse_depth_img_root = os.path.join(camera_root, "sparse_depths_img_2")
+        os.makedirs(sparse_depth_img_root, exist_ok=True)
+
+        tgt_inds = self.edited_details["deleted_indices_of_target"]
+        deleted_xyz = ori_scene.pcd_xyz[tgt_inds]
+        deleted_ann = self.scene_details["delete"].get("annotations", None)
+        margin = self.scene_details["delete"].get("margin", 0.0)
+
+        deleted_inds = []
+        if deleted_ann is not None:
+            results = deleted_ann.is_points_in_bounding_boxes(
+                deleted_xyz,
+                margin=margin,
+                separate=True,
+            )
+            for indices in results:
+                deleted_inds.append(tgt_inds[indices])
+
+        deleted_inds = _cluster_overlapping_lists(deleted_inds)
+        deleted_inds = [np.sort(list(ind)) for ind in deleted_inds]
+
+        image_sequence = self.camera_sequence.get_a_camera(camera_name)
+        for index in range(len(image_sequence)):
+
+            name = self._initialize_cam_fnames(camera_name, index)
+            depth_img = ori_scene.get_a_depth_image(camera_name, index)
+            ind_map_tgt = ori_scene.get_a_sparse_point_indices(camera_name, index)
+
+            valid_tgt = ind_map_tgt > 0
+            overall_dense_mask = np.zeros_like(ind_map_tgt, dtype=bool)
+
+            for indices in deleted_inds:
+                # compare indices and ind_map_src
+                dense_mask = np.zeros_like(ind_map_tgt, dtype=bool)
+                valid = np.isin(ind_map_tgt[valid_tgt], indices)
+
+                dense_mask[valid_tgt] |= valid
+                dense_mask = utils_img.fill_sparse_boolean_by_convex_hull(dense_mask)
+                dense_mask = dense_mask > 0
+                overall_dense_mask |= dense_mask
+
+            depth_img = utils_img.overlay_image(
+                depth_img,
+                [1, 1, 0],
+                ratio=0.8,
+                mask=overall_dense_mask,
+            )
+
+            for indices in deleted_inds:
+                valid = np.isin(ind_map_tgt[valid_tgt], indices)
+                mask = np.zeros_like(ind_map_tgt, dtype=bool)
+                mask[valid_tgt] |= valid
+
+                depth_img = utils_img.overlay_image(
+                    depth_img,
+                    np.random.rand(3),
+                    ratio=0,
+                    mask=mask,
+                )
+
+            f_sparse_depth = os.path.join(sparse_depth_img_root, f"{name}.png")
+            plt.imsave(f_sparse_depth, depth_img)
 
     def process_camera(self, camera_name):
 

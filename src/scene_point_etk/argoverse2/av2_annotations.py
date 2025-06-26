@@ -222,7 +222,7 @@ class Annotations(ArgoMixin, array_data.TimePoseSequence):
 
         return rs
 
-    def is_points_in_bounding_boxes(self, points, margin=0.0):
+    def is_points_in_bounding_boxes(self, points, margin=0.0, separate=False):
 
         _results = self._kdtree_distance_filtering(points, margin=margin)
 
@@ -239,6 +239,9 @@ class Annotations(ArgoMixin, array_data.TimePoseSequence):
 
         if len(results) == 0:
             return np.array([], dtype=np.int64)
+
+        if separate:
+            return results
 
         results = np.hstack(results)
         return np.unique(results)
