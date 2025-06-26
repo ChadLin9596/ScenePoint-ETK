@@ -24,34 +24,6 @@ import py_utils.utils as utils
 import py_utils.voxel_grid as voxel_grid
 
 
-def unique_pcd(pcd_arr, voxel_size=0.2):
-
-    pcd_indices = pcd_arr["center"] // voxel_size
-    pcd_indices = pcd_indices.astype(np.int64)
-
-    # unique indices
-    _, unique_indices = np.unique(pcd_indices, axis=0, return_index=True)
-    unique_indices = np.sort(unique_indices)
-    return pcd_arr[unique_indices]
-
-
-def subtract_pcds(pcd_a, pcd_b, voxel_size=0.2):
-
-    pcd_a_indices = (pcd_a["center"] // voxel_size).astype(np.int64)
-    pcd_b_indices = (pcd_b["center"] // voxel_size).astype(np.int64)
-
-    # Use view-based conversion for efficient comparison
-    def to_unique_1d(array):
-        return array.view([("", array.dtype)] * array.shape[1]).ravel()
-
-    a_voxel_keys = to_unique_1d(pcd_a_indices)
-    b_voxel_keys = to_unique_1d(pcd_b_indices)
-
-    # keys in 'a' but not in 'b'
-    keep_mask = ~np.isin(a_voxel_keys, b_voxel_keys)
-    return pcd_a[keep_mask]
-
-
 def get_deleted_pcd(scene_pcd, delete_info, return_mask=False):
 
     # case: no delete point
@@ -116,11 +88,11 @@ def get_added_pcd(scene_pcd, add_info, return_splits=False):
 
         # update the patch's center
         patch["center"] = patch_xyz_world // voxel_size + 0.5 * voxel_size
-        patch = unique_pcd(patch, voxel_size=voxel_size)
+        patch = voxel_grid.unique_pcd(patch, voxel_size=voxel_size)
 
         # get the patch points that are not overlapping with the scene_pcd
         # no need to unique the scene_pcd, as it is already unique
-        patch = subtract_pcds(patch, scene_pcd, voxel_size=voxel_size)
+        patch = voxel_grid.subtract_pcds(patch, scene_pcd, voxel_size=voxel_size)
 
         added_pcd.append(patch)
 
@@ -132,23 +104,57 @@ def get_added_pcd(scene_pcd, add_info, return_splits=False):
     return added_pcd
 
 
-def apply_change_info_to_target_pcd(target_pcd, change_info):
+def apply_change_info_to_target_pcd(
+    target_pcd,
+    change_info,
+    return_details=False,
+):
 
     voxel_size = change_info.get("voxel_size", 0.2)
-    detete_info = change_info.get("delete", {})
+    delete_info = change_info.get("delete", {})
     add_info = change_info.get("add", {})
 
-    # removed points from detete_info
-    _, mask = get_deleted_pcd(target_pcd, detete_info, return_mask=True)
+    # removed points from delete_info
+    del_pcd, mask = get_deleted_pcd(target_pcd, delete_info, return_mask=True)
     target_pcd = target_pcd[~mask]
 
     # added points from add_info
-    additional_pcd = get_added_pcd(target_pcd, add_info)
-    target_pcd = np.concatenate([target_pcd, additional_pcd])
+    additional_pcd, split = get_added_pcd(
+        target_pcd,
+        add_info,
+        return_splits=True,
+    )
+    updated_pcd = np.concatenate([target_pcd, additional_pcd])
+
+    s = np.r_[0, split, len(additional_pcd)]
+    segment_info = np.repeat(np.arange(len(s) - 1), np.diff(s))
+    segment_info = np.r_[np.ones(len(target_pcd)) * -1, segment_info]
 
     # re-sort again, but does not need to re-voxelize
-    xyz = np.vstack([target_pcd["x"], target_pcd["y"], target_pcd["z"]]).T
+    xyz = np.vstack([updated_pcd["x"], updated_pcd["y"], updated_pcd["z"]]).T
     _, _, I = voxel_grid._sort_for_voxel_grid(xyz, voxel_size)
-    target_pcd = target_pcd[I]
+    updated_pcd = updated_pcd[I]
+    segment_info = segment_info[I]
 
-    return target_pcd
+    # TODO:
+    # get the segment_info from added_indices_of_source and split
+    # added_indices_of_source = np.argsort(I)
+    # added_indices_of_source = added_indices_of_source[len(target_pcd) :]
+
+    # create indices of source for each segment
+    segment_infos = []
+    for i in range(len(split) + 1):
+        segment_infos.append(np.where(segment_info == i)[0])
+
+    details = {
+        "deleted_points": del_pcd,
+        "added_points": additional_pcd,
+        "added_splits": split,
+        "deleted_indices_of_target": np.where(mask)[0],
+        "added_segment_indices_of_source": segment_infos,
+    }
+
+    if return_details:
+        return updated_pcd, details
+
+    return updated_pcd

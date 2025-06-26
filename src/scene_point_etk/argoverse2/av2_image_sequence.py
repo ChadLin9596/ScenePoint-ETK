@@ -272,6 +272,91 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         )
         return other
 
+    def get_a_depth_map(
+        self,
+        index,
+        points,
+        invalid_value=-1,
+        min_distance=0.0,
+        max_distance=np.inf,
+        return_details=False,
+    ):
+
+        extrinsic = self.extrinsic[index]
+        intrinsic = self.intrinsic
+
+        depth_map, point_map, details = utils_img.points_to_depth_image(
+            points,
+            intrinsic,
+            extrinsic,
+            *self.figsize,
+            invalid_value=invalid_value,
+            min_distance=min_distance,
+            max_distance=max_distance,
+            return_details=True,
+            other_attrs=[points],
+        )
+
+        details["point_map"] = point_map
+
+        if return_details:
+            return depth_map, details
+        return depth_map
+
+    def get_a_point_map(
+        self,
+        index,
+        points,
+        invalid_value=-1,
+        min_distance=0.0,
+        max_distance=np.inf,
+        return_details=False,
+    ):
+
+        _, details = self.get_a_depth_map(
+            index,
+            points,
+            invalid_value=invalid_value,
+            min_distance=min_distance,
+            max_distance=max_distance,
+            return_details=True,
+        )
+
+        point_map = details.pop("point_map", None)
+        if return_details:
+            return point_map, details
+        return point_map
+
+    def get_a_point_index_map(
+        self,
+        index,
+        points,
+        invalid_value=-1,
+        min_distance=0.0,
+        max_distance=np.inf,
+        return_details=False,
+    ):
+
+        _, details = self.get_a_depth_map(
+            index,
+            points,
+            invalid_value=invalid_value,
+            min_distance=min_distance,
+            max_distance=max_distance,
+            return_details=True,
+        )
+
+        details.pop("point_map", None)
+
+        u, v = details["uv"]
+        FOV_mask = details["FOV_mask"]
+        indices_map = np.full(self.figsize, -1, dtype=np.int32)
+        indices_map[u, v] = np.arange(len(points))[FOV_mask]
+
+        if return_details:
+            return indices_map, details
+        return indices_map
+
 
 class CameraSequence(ArgoMixin, array_data.Array):
 
