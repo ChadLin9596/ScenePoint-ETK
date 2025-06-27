@@ -8,6 +8,7 @@ from PIL import Image
 import scene_point_etk.argoverse2 as argoverse2
 from . import diff_scene
 
+import py_utils.array_data as array_data
 import py_utils.pcd as pcd
 import py_utils.utils as utils
 import py_utils.utils_img as utils_img
@@ -41,6 +42,45 @@ def _cluster_overlapping_lists(lists_of_indices):
             clusters[root].add(item)
 
     return list(clusters.values())
+
+
+def filter_visible(
+    static_depth_map,  # (H, W)
+    lidar_depth_map,  # (H, W)
+    overall_dense_mask,  # (H, W) boolean mask of dense points
+    neighborhood_size=3,  # Size of neighborhood for depth comparison
+    depth_threshold=0.1,  # Depth threshold for visibility
+    num_valid_points=1,
+):
+
+    pad = neighborhood_size // 2
+
+    valid_static = static_depth_map > 0
+    valid_lidar = lidar_depth_map > 0
+    visible_mask = overall_dense_mask & valid_static
+
+    H, W = static_depth_map.shape
+
+    us, vs = np.argwhere(visible_mask).T
+    for u, v in zip(us, vs):
+        u_min = max(0, u - pad)
+        u_max = min(H, u + pad + 1)
+        v_min = max(0, v - pad)
+        v_max = min(W, v + pad + 1)
+
+        lidar_patch = lidar_depth_map[u_min:u_max, v_min:v_max]
+        valid_lidar_patch = lidar_patch[lidar_patch > 0]
+
+        if len(valid_lidar_patch) < num_valid_points:
+            continue
+
+        lidar_depth = np.min(valid_lidar_patch)
+        static_depth = static_depth_map[u, v]
+
+        if (static_depth - lidar_depth) > depth_threshold:
+            visible_mask[u, v] = False
+
+    return visible_mask
 
 
 class PCDScene:
@@ -510,11 +550,37 @@ class EditedScene(Scene):
             plt.imsave(f_sparse_mask, sparse_change_mask, cmap="gray")
             plt.imsave(f_dense_mask, dense_change_mask, cmap="gray")
 
+    def get_source_sparse_mask(self, camera_name, filename_or_index):
+        filename = self._initialize_cam_fnames(camera_name, filename_or_index)
+
+        camera_root = os.path.join(self.cameras_root, camera_name)
+        sparse_cd_mask_root = os.path.join(camera_root, "sparse_changed_masks")
+        sparse_cd_mask_src_root = os.path.join(sparse_cd_mask_root, "source")
+        filepath = os.path.join(sparse_cd_mask_src_root, f"{filename}.png")
+
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"Sparse mask {filepath} does not exist")
+
+        return np.all(plt.imread(filepath) > 0, axis=-1)
+
+    def get_source_dense_mask(self, camera_name, filename_or_index):
+        filename = self._initialize_cam_fnames(camera_name, filename_or_index)
+
+        camera_root = os.path.join(self.cameras_root, camera_name)
+        dense_cd_mask_root = os.path.join(camera_root, "dense_changed_masks")
+        dense_cd_mask_src_root = os.path.join(dense_cd_mask_root, "source")
+        filepath = os.path.join(dense_cd_mask_src_root, f"{filename}.png")
+
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"Dense mask {filepath} does not exist")
+
+        return np.all(plt.imread(filepath) > 0, axis=-1)
+
     def process_visual_source_masks(self, camera_name):
 
         # for debug
         camera_root = os.path.join(self.cameras_root, camera_name)
-        sparse_depth_img_root = os.path.join(camera_root, "sparse_depths_img_1")
+        sparse_depth_img_root = os.path.join(camera_root, "visual_source_mask_img")
         os.makedirs(sparse_depth_img_root, exist_ok=True)
 
         image_sequence = self.camera_sequence.get_a_camera(camera_name)
@@ -592,12 +658,27 @@ class EditedScene(Scene):
         deleted_inds = [np.sort(list(ind)) for ind in deleted_inds]
 
         image_sequence = self.camera_sequence.get_a_camera(camera_name)
+
+        files = argoverse2.list_sweep_files_by_log_id(log_id=image_sequence.log_id)
+        times = [os.path.basename(f).replace(".feather", "") for f in files]
+        ts = array_data.Timestamps(len(files))
+        ts.timestamps = times
+        ts = ts.align_timestamps(image_sequence.timestamps)
+        files = np.r_[files][np.searchsorted(times, ts.timestamps)]
+        sweeps = [argoverse2.Sweep(file, coordinate="map") for file in files]
+
         for index in range(len(image_sequence)):
 
             name = self._initialize_cam_fnames(camera_name, index)
+            depth_map = ori_scene.get_a_sparse_depth(camera_name, index)
             ind_map_tgt = ori_scene.get_a_sparse_point_indices(camera_name, index)
-            valid_tgt = ind_map_tgt > 0
 
+            sweep_depth_map = image_sequence.get_a_depth_map(
+                index,
+                sweeps[index].xyz,
+            )
+
+            valid_tgt = ind_map_tgt > 0
             sparse_change_mask = np.zeros_like(ind_map_tgt, dtype=bool)
             dense_change_mask = np.zeros_like(ind_map_tgt, dtype=bool)
 
@@ -607,6 +688,13 @@ class EditedScene(Scene):
                 valid = np.isin(ind_map_tgt[valid_tgt], indices)
 
                 sparse_mask[valid_tgt] |= valid
+                sparse_mask = filter_visible(
+                    static_depth_map=depth_map,
+                    lidar_depth_map=sweep_depth_map,
+                    overall_dense_mask=sparse_mask,
+                    neighborhood_size=5,
+                    num_valid_points=2,
+                )
                 dense_mask = utils_img.fill_sparse_boolean_by_convex_hull(sparse_mask)
 
                 sparse_change_mask |= sparse_mask
@@ -618,13 +706,40 @@ class EditedScene(Scene):
             plt.imsave(f_sparse_mask, sparse_change_mask, cmap="gray")
             plt.imsave(f_dense_mask, dense_change_mask, cmap="gray")
 
+    def get_target_sparse_mask(self, camera_name, filename_or_index):
+        filename = self._initialize_cam_fnames(camera_name, filename_or_index)
+
+        camera_root = os.path.join(self.cameras_root, camera_name)
+        sparse_cd_mask_root = os.path.join(camera_root, "sparse_changed_masks")
+        sparse_cd_mask_tgt_root = os.path.join(sparse_cd_mask_root, "target")
+        filepath = os.path.join(sparse_cd_mask_tgt_root, f"{filename}.png")
+
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"Sparse mask {filepath} does not exist")
+
+        return np.all(plt.imread(filepath) > 0, axis=-1)
+
+    def get_target_dense_mask(self, camera_name, filename_or_index):
+
+        filename = self._initialize_cam_fnames(camera_name, filename_or_index)
+
+        camera_root = os.path.join(self.cameras_root, camera_name)
+        dense_cd_mask_root = os.path.join(camera_root, "dense_changed_masks")
+        dense_cd_mask_tgt_root = os.path.join(dense_cd_mask_root, "target")
+        filepath = os.path.join(dense_cd_mask_tgt_root, f"{filename}.png")
+
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"Dense mask {filepath} does not exist")
+
+        return np.all(plt.imread(filepath) > 0, axis=-1)
+
     def process_visual_target_masks(self, camera_name):
 
         ori_scene = OriginalScene(self.root)
 
         # for debug
         camera_root = os.path.join(self.cameras_root, camera_name)
-        sparse_depth_img_root = os.path.join(camera_root, "sparse_depths_img_2")
+        sparse_depth_img_root = os.path.join(camera_root, "visual_target_mask_img")
         os.makedirs(sparse_depth_img_root, exist_ok=True)
 
         tgt_inds = self.edited_details["deleted_indices_of_target"]
@@ -646,42 +761,62 @@ class EditedScene(Scene):
         deleted_inds = [np.sort(list(ind)) for ind in deleted_inds]
 
         image_sequence = self.camera_sequence.get_a_camera(camera_name)
+
+        files = argoverse2.list_sweep_files_by_log_id(log_id=image_sequence.log_id)
+        times = [os.path.basename(f).replace(".feather", "") for f in files]
+        ts = array_data.Timestamps(len(files))
+        ts.timestamps = times
+        ts = ts.align_timestamps(image_sequence.timestamps)
+        files = np.r_[files][np.searchsorted(times, ts.timestamps)]
+        sweeps = [argoverse2.Sweep(file, coordinate="map") for file in files]
+
         for index in range(len(image_sequence)):
 
             name = self._initialize_cam_fnames(camera_name, index)
-            depth_img = ori_scene.get_a_depth_image(camera_name, index)
+            depth_img = image_sequence.get_an_image(index) / 255.0
+            depth_map = ori_scene.get_a_sparse_depth(camera_name, index)
             ind_map_tgt = ori_scene.get_a_sparse_point_indices(camera_name, index)
 
+            sweep_depth_img = image_sequence.get_a_depth_map(
+                index,
+                sweeps[index].xyz,
+            )
+
             valid_tgt = ind_map_tgt > 0
-            overall_dense_mask = np.zeros_like(ind_map_tgt, dtype=bool)
+            sparse_change_masks = []
+            dense_change_mask = np.zeros_like(ind_map_tgt, dtype=bool)
 
             for indices in deleted_inds:
                 # compare indices and ind_map_src
-                dense_mask = np.zeros_like(ind_map_tgt, dtype=bool)
+                sparse_mask = np.zeros_like(ind_map_tgt, dtype=bool)
                 valid = np.isin(ind_map_tgt[valid_tgt], indices)
 
-                dense_mask[valid_tgt] |= valid
-                dense_mask = utils_img.fill_sparse_boolean_by_convex_hull(dense_mask)
-                dense_mask = dense_mask > 0
-                overall_dense_mask |= dense_mask
+                sparse_mask[valid_tgt] |= valid
+                sparse_mask = filter_visible(
+                    static_depth_map=depth_map,
+                    lidar_depth_map=sweep_depth_img,
+                    overall_dense_mask=sparse_mask,
+                    neighborhood_size=5,
+                    num_valid_points=2,
+                )
+                sparse_change_masks.append(sparse_mask)
+                dense_mask = utils_img.fill_sparse_boolean_by_convex_hull(sparse_mask)
+
+                dense_change_mask |= dense_mask > 0
 
             depth_img = utils_img.overlay_image(
                 depth_img,
                 [1, 1, 0],
-                ratio=0.8,
-                mask=overall_dense_mask,
+                ratio=0.5,
+                mask=dense_change_mask,
             )
 
-            for indices in deleted_inds:
-                valid = np.isin(ind_map_tgt[valid_tgt], indices)
-                mask = np.zeros_like(ind_map_tgt, dtype=bool)
-                mask[valid_tgt] |= valid
-
+            for sparse_change_mask in sparse_change_masks:
                 depth_img = utils_img.overlay_image(
                     depth_img,
                     np.random.rand(3),
-                    ratio=0,
-                    mask=mask,
+                    ratio=0.5,
+                    mask=sparse_change_mask,
                 )
 
             f_sparse_depth = os.path.join(sparse_depth_img_root, f"{name}.png")
@@ -692,6 +827,9 @@ class EditedScene(Scene):
         super().process_camera(camera_name)
         self.process_source_masks(camera_name)
         self.process_target_masks(camera_name)
+        self.process_depth_images(camera_name)
+        self.process_visual_source_masks(camera_name)
+        self.process_visual_target_masks(camera_name)
 
 
 class SceneImageDataset(EditedScene):

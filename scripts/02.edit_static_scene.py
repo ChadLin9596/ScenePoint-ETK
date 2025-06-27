@@ -126,10 +126,7 @@ def main(args):
         print(json.dumps(args, indent=4))
 
     log_ids = argoverse2.SENSOR_MAP.keys()
-    if (
-        args["selective_logids"] is not None
-        and len(args["selective_logids"]) > 0
-    ):
+    if args["selective_logids"] is not None and len(args["selective_logids"]) > 0:
         log_ids = args["selective_logids"]
 
     for log_id in log_ids:
@@ -189,6 +186,8 @@ def main(args):
                 original_scene.scene_pcd,
                 scene_delete.scene_details,
             )
+            for camera in scene_delete.camera_sequence.list_cameras():
+                scene_delete.process_camera(camera)
 
         valid_add = len(add_info["patches"]) > 0
         do_add = _overwrite or add_scene_name not in existing_versions
@@ -204,6 +203,8 @@ def main(args):
                 original_scene.scene_pcd,
                 scene_add.scene_details,
             )
+            for camera in scene_add.camera_sequence.list_cameras():
+                scene_add.process_camera(camera)
 
         # if delete_info cannot remove any point, then the overall will be
         # exact same as `add`, thus skipping
@@ -217,10 +218,12 @@ def main(args):
                 "add": add_info,
                 "voxel_size": args["pcd_params"]["voxel_size"],
             }
-            scene_add.scene_overall = scene_db.apply_change_info_to_target_pcd(
+            scene_overall.scene_pcd = scene_db.apply_change_info_to_target_pcd(
                 original_scene.scene_pcd,
                 scene_overall.scene_details,
             )
+            for camera in scene_overall.camera_sequence.list_cameras():
+                scene_overall.process_camera(camera)
 
         common.xprint(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 
@@ -235,11 +238,7 @@ def parser_args():
     args = parser.parse_args()
 
     config = args.config
-    config = (
-        config
-        if config == os.path.abspath(config)
-        else os.path.join(_pre_cwd, args.config)
-    )
+    config = config if config == os.path.abspath(config) else os.path.join(_pre_cwd, args.config)
 
     with open(config, "r") as fd:
         args = yaml.safe_load(fd)
