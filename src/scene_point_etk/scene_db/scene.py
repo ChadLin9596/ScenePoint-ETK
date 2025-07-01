@@ -374,13 +374,13 @@ class Scene(PCDScene):
         os.makedirs(output_root, exist_ok=True)
 
         if not skip_scene:
-            shutil.copy(self.details_filepath, os.path.join(output_root, "details.pkl"))
+            path = os.path.join(output_root, "details.pkl")
+            shutil.copy(self.details_filepath, path)
+
         if not skip_cameras:
             os.makedirs(os.path.join(output_root, "cameras"), exist_ok=True)
-            shutil.copy(
-                self.camera_sequence_filepath,
-                os.path.join(output_root, "cameras", "cam_sequence.pkl"),
-            )
+            path = os.path.join(output_root, "cameras", "cam_sequence.pkl")
+            shutil.copy(self.camera_sequence_filepath, path)
 
 
 class OriginalScene(Scene):
@@ -438,6 +438,22 @@ class OriginalScene(Scene):
             img = img_seq.get_an_image(index)
             plt.imsave(os.path.join(images_root, name), img)
             prog.toc()
+
+    @property
+    def scene_pcd(self):
+        if hasattr(self, "_scene_pcd"):
+            return self._scene_pcd.copy()
+
+        if not os.path.exists(self.scene_filepath):
+            details = self.scene_details
+            voxel_size = details.get("voxel_size", 0.2)
+
+            sweeps = argoverse2.SweepSequence.from_sweeps(details["sweeps"])
+            scene = sweeps.export_to_voxel_grid(voxel_size=voxel_size)
+            pcd.write(self.scene_filepath, scene)
+
+        self._scene_pcd = pcd.read(self.scene_filepath)
+        return self._scene_pcd.copy()
 
 
 class EditedScene(Scene):
@@ -510,6 +526,23 @@ class EditedScene(Scene):
         )
         self._edited_details = details
         return self._edited_details
+
+    @property
+    def scene_pcd(self):
+        if hasattr(self, "_scene_pcd"):
+            return self._scene_pcd.copy()
+
+        if not os.path.exists(self.scene_filepath):
+
+            original_scene = OriginalScene(self.root)
+            scene = diff_scene.apply_change_info_to_target_pcd(
+                original_scene.scene_pcd,
+                self.scene_details,
+            )
+            pcd.write(self.scene_filepath, scene)
+
+        self._scene_pcd = pcd.read(self.scene_filepath)
+        return self._scene_pcd.copy()
 
     def process_source_masks(self, camera_name):
 
