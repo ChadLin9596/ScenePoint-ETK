@@ -271,8 +271,8 @@ def apply_change_info_to_target_pcd(
     updated_pcd = np.concatenate([target_pcd, additional_pcd])
 
     s = np.r_[0, split, len(additional_pcd)]
-    s = np.diff(s).astype(np.int64)
-    segment_info = np.repeat(np.arange(len(s) - 1), s)
+    d = np.diff(s).astype(np.int64)
+    segment_info = np.repeat(np.arange(len(s) - 1), d)
     segment_info = np.r_[np.ones(len(target_pcd)) * -1, segment_info]
 
     # re-sort again, but does not need to re-voxelize

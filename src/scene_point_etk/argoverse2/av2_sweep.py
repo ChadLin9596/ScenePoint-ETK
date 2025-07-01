@@ -346,13 +346,15 @@ class SweepSequence(ArgoMixin, array_data.Array):
         return_details=False,
     ):
 
-        rgb = np.zeros((len(self), 3), dtype=np.float32)
+        xyz = self.xyz
+
+        rgb = np.zeros_like(xyz, dtype=np.float32)
         if not skip_color:
             # it will take a while to infer RGB
             rgb = self.rgb / 255.0
 
         vg = voxel_grid.VoxelGrid(
-            self.xyz,
+            xyz,
             voxel_size=voxel_size,
             attributes=[self.intensity, rgb],
         )

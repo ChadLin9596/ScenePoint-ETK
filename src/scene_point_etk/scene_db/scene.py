@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 import scene_point_etk.argoverse2 as argoverse2
 from . import diff_scene
+from .. import utils as scene_utils
 
 import py_utils.array_data as array_data
 import py_utils.pcd as pcd
@@ -151,6 +152,12 @@ class PCDScene:
     def pcd_count(self):
         p = self.scene_pcd
         return p["count"]
+
+    @property
+    def pcd_color(self):
+        p = self.scene_pcd
+        r, g, b, a = scene_utils.decode_rgba(p["rgb"])
+        return np.vstack([r, g, b]).T
 
     @property
     def scene_details(self):
