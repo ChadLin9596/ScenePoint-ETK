@@ -514,3 +514,23 @@ class CameraSequence(ArgoMixin, array_data.Array):
         other = copy.copy(self)
         other.cameras = cameras
         return other
+
+    def colour_single_sweep(self, sweep_timestamp, points):
+
+        rgb = np.ones_like(points, dtype=np.float32)
+
+        for camera in self.cameras:
+
+            index = np.argmin(np.abs(camera.timestamps - sweep_timestamp))
+            index_map = utils_img.points_to_index_map(
+                points,
+                camera.intrinsic,
+                camera.extrinsic[index],
+                *camera.figsize,
+            )
+            image = camera.get_an_image(index)
+
+            mask = index_map >= 0
+            rgb[index_map[mask]] = image[mask]
+
+        return rgb

@@ -15,6 +15,7 @@ from .av2_basic_tools import (
     ArgoMixin,
 )
 from .av2_annotations import Annotations
+from .av2_image_sequence import CameraSequence
 
 CLOUD_COMPARE_DTYPE = [
     ("x", np.float32),
@@ -184,6 +185,18 @@ class Sweep(ArgoMixin, array_data.Array):
         name = os.path.basename(self._path)
         return int(name.split(".")[0])
 
+    def infer_color_by_camera_sequence(self, camera_sequence):
+
+        if not isinstance(camera_sequence, CameraSequence):
+            msg = f"Expect CameraSequence, got {type(camera_sequence)}"
+            raise ValueError(msg)
+
+        if not camera_sequence.log_id == self.log_id:
+            raise ValueError("Log IDs do not match")
+
+        timestamp = self.sweep_timestamp
+        return camera_sequence.colour_single_sweep(timestamp, self.xyz)
+
 
 class SweepSequence(ArgoMixin, array_data.Array):
 
@@ -350,3 +363,23 @@ class SweepSequence(ArgoMixin, array_data.Array):
         if return_details:
             return X, details
         return X
+
+    @property
+    def rgb(self):
+
+        if hasattr(self, "_rgb"):
+            return self._rgb
+
+        times = self.sweep_timestamp
+        camera_sequence = CameraSequence(self.log_id).align_timestamps(times)
+
+        prog = utils.ProgressTimer(prefix="Inferring RGB")
+        prog.tic(len(self.sweeps))
+        rgbs = []
+        for sweep in self.sweeps:
+            rgb = sweep.infer_color_by_camera_sequence(camera_sequence)
+            rgbs.append(rgb)
+            prog.toc()
+
+        self._rgb = np.vstack(rgbs)
+        return self._rgb
