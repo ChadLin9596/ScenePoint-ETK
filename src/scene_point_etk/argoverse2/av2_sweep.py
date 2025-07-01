@@ -16,6 +16,7 @@ from .av2_basic_tools import (
 )
 from .av2_annotations import Annotations
 from .av2_image_sequence import CameraSequence
+from .. import utils as scene_utils
 
 CLOUD_COMPARE_DTYPE = [
     ("x", np.float32),
@@ -338,12 +339,22 @@ class SweepSequence(ArgoMixin, array_data.Array):
     def sweep_timestamp(self):
         return [s.sweep_timestamp for s in self.sweeps]
 
-    def export_to_voxel_grid(self, voxel_size=0.2, return_details=False):
+    def export_to_voxel_grid(
+        self,
+        voxel_size=0.2,
+        skip_color=True,
+        return_details=False,
+    ):
+
+        rgb = np.zeros((len(self), 3), dtype=np.float32)
+        if not skip_color:
+            # it will take a while to infer RGB
+            rgb = self.rgb / 255.0
 
         vg = voxel_grid.VoxelGrid(
             self.xyz,
             voxel_size=voxel_size,
-            attributes=[self.intensity],
+            attributes=[self.intensity, rgb],
         )
 
         details = {
@@ -356,6 +367,7 @@ class SweepSequence(ArgoMixin, array_data.Array):
         X["x"] = vg.voxel_centroids[:, 0]
         X["y"] = vg.voxel_centroids[:, 1]
         X["z"] = vg.voxel_centroids[:, 2]
+        X["rgb"] = scene_utils.encode_rgba(*vg.voxel_attributes[1].T)
         X["center"] = vg.voxel_centers
         X["count"] = vg.voxel_counts
         X["intensity"] = vg.voxel_attributes[0]

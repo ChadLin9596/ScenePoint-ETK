@@ -455,6 +455,15 @@ class OriginalScene(Scene):
         self._scene_pcd = pcd.read(self.scene_filepath)
         return self._scene_pcd.copy()
 
+    @scene_pcd.setter
+    def scene_pcd(self, pcd_data):
+        default_dtype = np.dtype(argoverse2.CLOUD_COMPARE_DTYPE)
+        if pcd_data.dtype != default_dtype:
+            raise ValueError("Invalid pcd data type")
+
+        pcd.write(self.scene_filepath, pcd_data)
+        self._scene_pcd = pcd_data.copy()
+
 
 class EditedScene(Scene):
     """
@@ -543,6 +552,15 @@ class EditedScene(Scene):
 
         self._scene_pcd = pcd.read(self.scene_filepath)
         return self._scene_pcd.copy()
+
+    @scene_pcd.setter
+    def scene_pcd(self, pcd_data):
+        default_dtype = np.dtype(argoverse2.CLOUD_COMPARE_DTYPE)
+        if pcd_data.dtype != default_dtype:
+            raise ValueError("Invalid pcd data type")
+
+        pcd.write(self.scene_filepath, pcd_data)
+        self._scene_pcd = pcd_data.copy()
 
     def process_source_masks(self, camera_name):
 

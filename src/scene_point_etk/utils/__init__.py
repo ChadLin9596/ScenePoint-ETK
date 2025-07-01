@@ -14,6 +14,15 @@ from .clustering import (
 def encode_rgba(r, g, b, a=255):
     """Encode RGB and alpha values into a single 32bytes."""
 
+    if np.isscalar(r):
+        r = [r]
+    if np.isscalar(g):
+        g = [g]
+    if np.isscalar(b):
+        b = [b]
+    if np.isscalar(a):
+        a = [a]
+
     r = np.asarray(r, dtype=np.float32)
     g = np.asarray(g, dtype=np.float32)
     b = np.asarray(b, dtype=np.float32)
@@ -50,7 +59,7 @@ def encode_rgba(r, g, b, a=255):
 def decode_rgba(bgra):
     """Decode a 32bytes RGBA value into r, g, b, a."""
 
-    bgra = np.asarray(bgra, dtype=np.float32)
+    bgra = np.asarray(bgra.copy(), dtype=np.float32)
     bgra = bgra.view(np.uint8).reshape(-1, 4)
 
     b = bgra[:, 0]
