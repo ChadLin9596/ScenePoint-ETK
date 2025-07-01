@@ -562,6 +562,24 @@ class EditedScene(Scene):
         pcd.write(self.scene_filepath, pcd_data)
         self._scene_pcd = pcd_data.copy()
 
+    @property
+    def bounding_boxes(self):
+
+        orig_scene = OriginalScene(self.root)
+        details = self.scene_details
+
+        add_info = details.get("add", {})
+        delete_info = details.get("delete", {})
+
+        results = {
+            "add": diff_scene.get_added_pcd_bounding_boxes(add_info),
+            "delete": diff_scene.get_deleted_pcd_bounding_boxes(
+                orig_scene.scene_pcd, delete_info
+            ),
+        }
+
+        return results
+
     def process_source_masks(self, camera_name):
 
         camera_root = os.path.join(self.cameras_root, camera_name)
