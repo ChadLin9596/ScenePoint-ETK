@@ -47,8 +47,3 @@ if __name__ == "__main__":
         args.output,
         dry_run=args.dry,
     )
-    main(
-        "s3://argoverse/datasets/av2/sensor/test/",
-        args.output,
-        dry_run=args.dry,
-    )

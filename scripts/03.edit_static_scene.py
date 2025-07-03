@@ -25,7 +25,11 @@ _overwrite = False
 ################
 
 
-def make_delete_info(log_id, bbox_margin=0.5):
+def make_delete_info(
+    log_id,
+    bbox_margin=0.5,
+    FOV_cameras=["ring_front_left"],
+):
 
     # initiate delete info
     delete_info = {"annotations": None, "margin": bbox_margin, "indices": []}
@@ -43,7 +47,7 @@ def make_delete_info(log_id, bbox_margin=0.5):
     bbox_vertices = static_annotations.bounding_box_vertices(bbox_margin)
     bbox_vertices = bbox_vertices.reshape(-1, 3)
 
-    camera_sequence = original_scene.camera_sequence
+    camera_sequence = argoverse2.CameraSequence(log_id, cameras=FOV_cameras)
     point_masks = camera_sequence.FOV_mask(
         bbox_vertices,
         min_distance=0,
@@ -75,8 +79,6 @@ def make_add_info(
     voxel_size=0.2,
 ):
 
-    original_scene = scene_db.OriginalScene(log_id)
-
     # anchors: the 3d points locate at ground for new points mounting
     anchors = scene_utils.infer_anchor_points_by_av2_log_id(
         log_id,
@@ -87,10 +89,9 @@ def make_add_info(
     )
 
     # assign orientation to each anchor point
-    img_seq = original_scene.camera_sequence.get_a_camera(0)
-    poses = img_seq.transformation  # (N, 4, 4)
-    poses_xyz = poses[:, :3, 3]  # (N, 3)
-    poses_euler = utils.R_to_euler(poses[:, :3, :3])  # (N, 3)
+    poses = argoverse2.get_poses_by_log_id(log_id)
+    poses_xyz = poses["xyz"]
+    poses_euler = utils.R_to_euler(utils.Q_to_R(poses["q"]))
 
     # get the closest position to assign the yaw angle
     d = anchors[:, None, :2] - poses_xyz[:, :2]
@@ -125,9 +126,21 @@ def main(args):
     if common.VERBOSE:
         print(json.dumps(args, indent=4))
 
+    # list parameters that will be used in the process
+    bbox_margin = args["bbox_params"]["bbox_margin"]
+    area_per_points = args["anchor_params"]["area_per_point"]
+    FOV_cameras = args["anchor_params"]["FOV_cameras"]
+    FOV_max_distance = args["anchor_params"]["FOV_max_distance"]
+    FOV_min_distance = args["anchor_params"]["FOV_min_distance"]
+    ground_offset = args["anchor_params"]["ground_offset"]
+    voxel_size = args["pcd_params"]["voxel_size"]
+    selective_logids = args.get("selective_logids", None)
+    edited_scene_prefix = args.get("edit_scene_prefix", "edited.")
+
+    # replace log_ids with selective_logids if provided
     log_ids = argoverse2.SENSOR_MAP.keys()
-    if args["selective_logids"] is not None and len(args["selective_logids"]) > 0:
-        log_ids = args["selective_logids"]
+    if selective_logids is not None and len(selective_logids) > 0:
+        log_ids = selective_logids
 
     for log_id in log_ids:
 
@@ -137,9 +150,16 @@ def main(args):
         if log_id in scene_db.list_scene_ids():
             existing_versions = scene_db.list_versions_by_scene_id(log_id)
 
+        delete_scene_name = edited_scene_prefix + "delete"
+        add_scene_name = edited_scene_prefix + "add"
+        overall_scene_name = edited_scene_prefix + "overall"
+
+        del_exist = delete_scene_name in existing_versions
+        add_exist = add_scene_name in existing_versions
+        overall_exist = overall_scene_name in existing_versions
+
         # ---  prepare delete_info  ---
-        delete_scene_name = args["edit_scene_prefix"] + "delete"
-        if delete_scene_name in existing_versions and not _overwrite:
+        if del_exist and not _overwrite:
 
             delete_info = scene_db.EditedScene(log_id, delete_scene_name)
             delete_info = delete_info.scene_details["delete"]
@@ -148,12 +168,12 @@ def main(args):
 
             delete_info = make_delete_info(
                 log_id,
-                bbox_margin=args["bbox_params"]["bbox_margin"],
+                bbox_margin=bbox_margin,
+                FOV_cameras=FOV_cameras,
             )
 
         # ---  prepare add info ---
-        add_scene_name = args["edit_scene_prefix"] + "add"
-        if add_scene_name in existing_versions and not _overwrite:
+        if add_exist and not _overwrite:
 
             add_info = scene_db.EditedScene(log_id, add_scene_name)
             add_info = add_info.scene_details["add"]
@@ -162,68 +182,57 @@ def main(args):
 
             add_info = make_add_info(
                 log_id,
-                area_per_points=args["anchor_params"]["area_per_point"],
-                FOV_cameras=args["anchor_params"]["FOV_cameras"],
-                FOV_max_distance=args["anchor_params"]["FOV_max_distance"],
-                FOV_min_distance=args["anchor_params"]["FOV_min_distance"],
-                ground_offset=args["anchor_params"]["ground_offset"],
-                voxel_size=args["pcd_params"]["voxel_size"],
+                area_per_points=area_per_points,
+                FOV_cameras=FOV_cameras,
+                FOV_max_distance=FOV_max_distance,
+                FOV_min_distance=FOV_min_distance,
+                ground_offset=ground_offset,
+                voxel_size=voxel_size,
             )
 
-        original_scene = scene_db.OriginalScene(log_id)
+        # ---  process the scene ---
 
         valid_delete = delete_info["annotations"] is not None
-        do_delete = _overwrite or delete_scene_name not in existing_versions
+        valid_add = len(add_info["patches"]) > 0
+        valid_overall = valid_add and valid_delete
+
+        do_delete = _overwrite or not del_exist
         if valid_delete and do_delete:
 
             scene_delete = scene_db.EditedScene(log_id, delete_scene_name)
             scene_delete.scene_details = {
                 "delete": delete_info,
                 "add": {},
-                "voxel_size": args["pcd_params"]["voxel_size"],
+                "voxel_size": voxel_size,
             }
-            scene_delete.scene_pcd = scene_db.apply_change_info_to_target_pcd(
-                original_scene.scene_pcd,
-                scene_delete.scene_details,
-            )
-            for camera in scene_delete.camera_sequence.list_cameras():
-                scene_delete.process_camera(camera)
+            # it will automatically write the point cloud
+            scene_delete.scene_pcd
 
-        valid_add = len(add_info["patches"]) > 0
-        do_add = _overwrite or add_scene_name not in existing_versions
+        do_add = _overwrite or not add_exist
         if valid_add and do_add:
 
             scene_add = scene_db.EditedScene(log_id, add_scene_name)
             scene_add.scene_details = {
                 "delete": {},
                 "add": add_info,
-                "voxel_size": args["pcd_params"]["voxel_size"],
+                "voxel_size": voxel_size,
             }
-            scene_add.scene_pcd = scene_db.apply_change_info_to_target_pcd(
-                original_scene.scene_pcd,
-                scene_add.scene_details,
-            )
-            for camera in scene_add.camera_sequence.list_cameras():
-                scene_add.process_camera(camera)
+            # it will automatically write the point cloud
+            scene_add.scene_pcd
 
         # if delete_info cannot remove any point, then the overall will be
         # exact same as `add`, thus skipping
-        overall_scene_name = args["edit_scene_prefix"] + "overall"
-        do_overall = _overwrite or overall_scene_name not in existing_versions
-        if valid_delete and valid_add and do_overall:
+        do_overall = _overwrite or not overall_exist
+        if valid_overall and do_overall:
 
             scene_overall = scene_db.EditedScene(log_id, overall_scene_name)
             scene_overall.scene_details = {
                 "delete": delete_info,
                 "add": add_info,
-                "voxel_size": args["pcd_params"]["voxel_size"],
+                "voxel_size": voxel_size,
             }
-            scene_overall.scene_pcd = scene_db.apply_change_info_to_target_pcd(
-                original_scene.scene_pcd,
-                scene_overall.scene_details,
-            )
-            for camera in scene_overall.camera_sequence.list_cameras():
-                scene_overall.process_camera(camera)
+            # it will automatically write the point cloud
+            scene_overall.scene_pcd
 
         common.xprint(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 
@@ -238,7 +247,11 @@ def parser_args():
     args = parser.parse_args()
 
     config = args.config
-    config = config if config == os.path.abspath(config) else os.path.join(_pre_cwd, args.config)
+    config = (
+        config
+        if config == os.path.abspath(config)
+        else os.path.join(_pre_cwd, args.config)
+    )
 
     with open(config, "r") as fd:
         args = yaml.safe_load(fd)

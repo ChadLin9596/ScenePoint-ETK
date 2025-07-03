@@ -12,7 +12,7 @@ import py_utils.utils_img as utils_img
 
 from .av2_basic_tools import (
     check_log_id,
-    list_cameras,
+    list_cameras_by_log_id,
     get_root_from_log_id,
     get_poses_by_log_id,
     get_extrinsic_by_log_id,
@@ -27,7 +27,7 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
 
         check_log_id(log_id)
 
-        if camera not in list_cameras():
+        if camera not in list_cameras_by_log_id(log_id):
             raise ValueError(f"Camera {camera} not supported")
 
         root = get_root_from_log_id(log_id)
@@ -174,8 +174,8 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
     @property
     def extrinsic_to_ego(self):
 
-        if hasattr(self, "_extrinsic"):
-            return self._extrinsic
+        if hasattr(self, "_extrinsic_to_ego"):
+            return self._extrinsic_to_ego
 
         X = get_extrinsic_by_log_id(self.log_id)
         index = np.searchsorted(X["sensor_name"].to_numpy(), self.camera)
@@ -187,12 +187,18 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         extrinsic[:3, :3] = R
         extrinsic[:3, 3] = T
 
-        self._extrinsic = extrinsic
-        return self._extrinsic
+        self._extrinsic_to_ego = extrinsic
+        return self._extrinsic_to_ego
 
     @property
     def extrinsic(self):
-        return self.transformation @ self.extrinsic_to_ego[None, ...]
+
+        if hasattr(self, "_extrinsic"):
+            return self._extrinsic
+
+        extrinsic = self.transformation @ self.extrinsic_to_ego[None, ...]
+        self._extrinsic = extrinsic
+        return self._extrinsic
 
     def filter_by_image_viewing(
         self,
@@ -360,16 +366,35 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
 
 class CameraSequence(ArgoMixin, array_data.Array):
 
-    def __init__(self, log_id, cameras=list_cameras()):
+    def __init__(
+        self,
+        log_id,
+        cameras=[
+            "ring_front_center",
+            "ring_front_left",
+            "ring_front_right",
+            "ring_rear_left",
+            "ring_rear_right",
+            "ring_side_left",
+            "ring_side_right",
+            "stereo_front_left",
+            "stereo_front_right",
+        ],
+    ):
 
         check_log_id(log_id)
 
         if not np.iterable(cameras):
             cameras = [cameras]
 
+        # guarantee that all cameras are valid
+        _cameras = []
         for camera in cameras:
-            if camera not in list_cameras():
-                raise ValueError(f"Camera {camera} not supported")
+            valid_cameras = list_cameras_by_log_id(log_id)
+            if camera not in valid_cameras:
+                continue
+            _cameras.append(camera)
+        cameras = _cameras
 
         super().__init__(len(cameras))
 
