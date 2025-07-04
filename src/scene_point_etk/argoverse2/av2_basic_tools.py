@@ -62,7 +62,7 @@ def check_city(city):
 
     path_this_file = os.path.dirname(os.path.abspath(__file__))
 
-    with open(os.path.join(path_this_file, "/city_2_log_id.json"), "r") as fd:
+    with open(os.path.join(path_this_file, "city_2_log_id.json"), "r") as fd:
         data = json.load(fd)
 
     if city not in data:
@@ -73,11 +73,24 @@ def list_log_ids():
     return sorted(list(SENSOR_MAP.keys()))
 
 
+def list_log_ids_by_mode(mode="test"):
+
+    path_this_file = os.path.dirname(os.path.abspath(__file__))
+
+    with open(os.path.join(path_this_file, "log_splits.json"), "r") as fd:
+        data = json.load(fd)
+
+    if mode not in data:
+        raise ValueError(f"Mode {mode} not found")
+
+    return sorted(data[mode])
+
+
 def list_cities():
 
     path_this_file = os.path.dirname(os.path.abspath(__file__))
 
-    with open(os.path.join(path_this_file, "/city_2_log_id.json"), "r") as fd:
+    with open(os.path.join(path_this_file, "city_2_log_id.json"), "r") as fd:
         data = json.load(fd)
 
     return sorted(list(data.keys()))
@@ -121,7 +134,7 @@ def get_log_ids_from_city(city):
 
     path_this_file = os.path.dirname(os.path.abspath(__file__))
 
-    with open(os.path.join(path_this_file, "/city_2_log_id.json"), "r") as fd:
+    with open(os.path.join(path_this_file, "city_2_log_id.json"), "r") as fd:
         data = json.load(fd)
 
     return data.get(city, [])
