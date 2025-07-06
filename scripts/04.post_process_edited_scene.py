@@ -35,7 +35,7 @@ def main(args):
             origin_scene = scene_db.OriginalScene(log_id)
             edited_scene = scene_db.EditedScene(log_id, version)
 
-            if len(edited_scene.added_pcds) == 0:
+            if len(edited_scene.scene_details["add"]) == 0:
                 print(f"Scene {log_id} -> {version} has no added patches.")
                 continue
 

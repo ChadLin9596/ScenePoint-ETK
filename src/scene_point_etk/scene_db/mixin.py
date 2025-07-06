@@ -220,6 +220,10 @@ class EditedDetailsMixin:
         deleted_pcd = self.edited_details["deleted_points"]
         deleted_ind = self.edited_details["deleted_indices_of_target"]
 
+        if len(deleted_pcd) == 0:
+            self._deleted_indices = []
+            return self._deleted_indices
+
         deleted_det = self.scene_details["delete"]
         deleted_ann = deleted_det["annotations"]
         margin = deleted_det["margin"]
