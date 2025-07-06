@@ -9,136 +9,13 @@ from PIL import Image
 import scene_point_etk.argoverse2 as argoverse2
 from . import diff_scene
 from .. import utils as scene_utils
+from .mixin import *
 
 import py_utils.array_data as array_data
 import py_utils.pcd as pcd
 import py_utils.utils as utils
 import py_utils.utils_img as utils_img
 import py_utils.visualization_pptk as vis_pptk
-
-#########
-# Mixin #
-#########
-
-
-class ScenePCDMixin:
-
-    scene_filepath = ""
-
-    @property
-    def scene_pcd(self):
-        if hasattr(self, "_scene_pcd"):
-            return self._scene_pcd.copy()
-
-        if not os.path.exists(self.scene_filepath):
-            raise FileNotFoundError(f"{self.scene_filepath} does not exist")
-
-        self._scene_pcd = pcd.read(self.scene_filepath)
-        return self._scene_pcd.copy()
-
-    @scene_pcd.setter
-    def scene_pcd(self, pcd_data):
-        default_dtype = np.dtype(argoverse2.CLOUD_COMPARE_DTYPE)
-        if pcd_data.dtype != default_dtype:
-            raise ValueError("Invalid pcd data type")
-
-        pcd.write(self.scene_filepath, pcd_data)
-        self._scene_pcd = pcd_data.copy()
-
-    @property
-    def pcd_xyz(self):
-        p = self.scene_pcd
-        xyz = np.vstack([p["x"], p["y"], p["z"]]).T
-        return xyz
-
-    @property
-    def pcd_intensity(self):
-        p = self.scene_pcd
-        return p["intensity"]
-
-    @property
-    def pcd_center(self):
-        p = self.scene_pcd
-        return p["center"]
-
-    @property
-    def pcd_count(self):
-        p = self.scene_pcd
-        return p["count"]
-
-    @property
-    def pcd_color(self):
-        p = self.scene_pcd
-        r, g, b, a = scene_utils.decode_rgba(p["rgb"])
-        return np.vstack([r, g, b]).T
-
-
-class SceneDetailsMixin:
-
-    details_filepath = ""
-
-    @property
-    def scene_details(self):
-        if not os.path.exists(self.details_filepath):
-            return None
-
-        with open(self.details_filepath, "rb") as fd:
-            return pickle.load(fd)
-
-    @scene_details.setter
-    def scene_details(self, details):
-        with open(self.details_filepath, "wb") as fd:
-            pickle.dump(details, fd)
-
-
-class CameraSequenceMixin:
-
-    camera_seq_filepath = ""
-
-    @property
-    def camera_sequence(self):
-        if hasattr(self, "_camera_sequence"):
-            return self._camera_sequence
-
-        if not os.path.exists(self.camera_seq_filepath):
-            raise FileNotFoundError(
-                f"{self.camera_seq_filepath} does not exist"
-            )
-
-        with open(self.camera_seq_filepath, "rb") as f:
-            camera_sequence = pickle.load(f)
-
-        self._camera_sequence = camera_sequence
-        return self._camera_sequence
-
-    @camera_sequence.setter
-    def camera_sequence(self, camera_sequence):
-        if not isinstance(camera_sequence, argoverse2.CameraSequence):
-            raise TypeError("Expected CameraSequence object")
-
-        self._camera_sequence = camera_sequence
-        with open(self.camera_seq_filepath, "wb") as f:
-            pickle.dump(camera_sequence, f)
-
-    @property
-    def cameras(self):
-        return self.camera_sequence.list_cameras()
-
-    def get_camera_filenames(self, camera_name):
-        camera_sequence = self.camera_sequence.get_a_camera(camera_name)
-        return list(map(str, camera_sequence.timestamps))
-
-    def _initialize_cam_fnames(self, camera_name, filename_or_index):
-
-        if isinstance(filename_or_index, int):
-            ind = filename_or_index
-            filename_or_index = self.get_camera_filenames(camera_name)[ind]
-
-        assert isinstance(filename_or_index, str)
-        filename = filename_or_index.replace(".npy", "")
-        filename = filename.replace(".png", "")
-        filename = filename.replace(".jpg", "")
-        return filename
 
 
 class Basic(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
@@ -180,73 +57,6 @@ class Basic(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
         self.scene_filepath = join(self.scene_root, "scene.pcd")
         self.details_filepath = join(self.scene_root, "details.pkl")
         self.camera_seq_filepath = join(self.cameras_root, "cam_sequence.pkl")
-
-    def get_point_indices_map_by_camera(self, camera_name, verbose=True):
-
-        camera_root = os.path.join(self.cameras_root, camera_name)
-        point_indices_root = os.path.join(camera_root, "sparse_point_indices")
-        os.makedirs(point_indices_root, exist_ok=True)
-
-        existing_files = sorted(
-            glob.glob(
-                os.path.join(camera_root, "sparse_point_indices", "*.npy")
-            ),
-            key=lambda x: os.path.basename(x),
-        )
-
-        if existing_files:
-            indices_maps = [np.load(f) for f in existing_files]
-            return np.array(indices_maps)
-
-        # Otherwise, compute from scratch
-        img_seq = self.camera_sequence.get_a_camera(camera_name)
-        intrinsic = img_seq.intrinsic
-        extrinsics = img_seq.extrinsic
-        xyz = self.pcd_xyz
-
-        H, W = img_seq.figsize
-        indices_maps = []
-
-        prog = utils.ProgressTimer(
-            prefix=f"Building indices {camera_name} ",
-            verbose=verbose,
-        )
-        prog.tic(len(img_seq))
-        for idx, extrinsic in enumerate(extrinsics):
-            index_map = utils_img.points_to_index_map(
-                xyz,
-                intrinsic,
-                extrinsic,
-                H,
-                W,
-                min_distance=0.0,
-                max_distance=np.inf,
-            )
-            indices_maps.append(index_map)
-            np.save(
-                os.path.join(
-                    point_indices_root, f"{img_seq.timestamps[idx]}.npy"
-                ),
-                index_map,
-            )
-            prog.toc()
-
-        return np.array(indices_maps)
-
-    @property
-    def point_indices_map(self):
-
-        if hasattr(self, "_point_indices_map"):
-            return self._point_indices_map
-
-        point_indices = {}
-        for camera in self.cameras:
-
-            indices = self.get_point_indices_map_by_camera(camera)
-            point_indices[camera] = indices
-
-        self._point_indices_map = point_indices
-        return self._point_indices_map.copy()
 
     def process_camera(self, camera_name):
 
@@ -379,7 +189,7 @@ class Basic(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
         if not skip_cameras:
             os.makedirs(os.path.join(output_root, "cameras"), exist_ok=True)
             path = os.path.join(output_root, "cameras", "cam_sequence.pkl")
-            shutil.copy(self.camera_sequence_filepath, path)
+            shutil.copy(self.camera_seq_filepath, path)
 
 
 class OriginalScene(Basic):
@@ -464,7 +274,7 @@ class OriginalScene(Basic):
         self._scene_pcd = pcd_data.copy()
 
 
-class EditedScene(Basic):
+class EditedScene(Basic, EditedDetailsMixin):
     """
     based on Scene structure, but assume the GT scene is already processed
     and has the following structure:
@@ -516,9 +326,8 @@ class EditedScene(Basic):
             msg = f"GT scene not found at {os.path.join(scene_root, 'GT')}"
             raise RuntimeError(msg)
 
-    @property
-    def camera_sequence_filepath(self):
-        return os.path.join(self.root, "GT", "cameras", "cam_sequence.pkl")
+        p = os.path.join(self.root, "GT", "cameras", "cam_sequence.pkl")
+        self.camera_seq_filepath = os.path.join(p)
 
     @property
     def edited_details(self):

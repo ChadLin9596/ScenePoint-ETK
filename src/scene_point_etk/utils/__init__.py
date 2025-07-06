@@ -10,6 +10,7 @@ from .clustering import (
     filter_voxel_grid_by_DBSCAN,
     cluster_overlapping_lists,
 )
+from py_utils.utils import *
 
 
 def encode_rgba(r, g, b, a=255):
@@ -77,6 +78,23 @@ def decode_rgba(bgra):
         a = a / 255.0
 
     return r, g, b, a
+
+
+def modified_pcd_projection(xyz):
+
+    # move points to the origin
+    mean = np.mean(xyz, axis=0)
+    xyz = xyz - mean
+
+    # rotate the points
+    cov = np.dot(xyz.T, xyz)
+    eigen_values, eigen_vectors = np.linalg.eig(cov)
+    eigen_values, eigen_vectors
+
+    theta = np.arctan2(eigen_vectors[1, 0], eigen_vectors[0, 0])
+    R = euler_to_R(np.array([0, 0, theta]))
+
+    return R, mean
 
 
 def filter_visible(
