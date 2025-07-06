@@ -143,27 +143,23 @@ def get_deleted_pcd_bounding_boxes(scene_pcd, delete_info):
     return results
 
 
-def get_added_pcd(scene_pcd, add_info, return_splits=False):
-
-    if len(add_info) == 0:
-        if return_splits:
-            return np.empty(0, dtype=np.dtype(CLOUD_COMPARE_DTYPE)), []
-        return np.empty(0, dtype=np.dtype(CLOUD_COMPARE_DTYPE))
-
-    # extract information from add_info
+def infer_merge_indices(scene_pcd, add_info):
+    """
+    Infer merge indices for the added patches based on the existing scene_pcd.
+    This is used to avoid adding points that are already in the scene_pcd.
+    """
     patches = add_info["patches"]
     anchor_xyzs = add_info["anchor_xyzs"]
     anchor_euls = add_info["anchor_eulers"]
     z_offset = add_info.get("z_offset", 0.0)
     voxel_size = add_info.get("voxel_size", 0.2)
-    assert len(patches) == len(anchor_xyzs) == len(anchor_euls)
 
     anchor_Rs = utils.euler_to_R(anchor_euls)
 
-    added_pcd = []
-    for patch, anchor_xyz, anchor_R in zip(patches, anchor_xyzs, anchor_Rs):
+    merge_indices = {}
+    for key, anchor_xyz, anchor_R in zip(patches, anchor_xyzs, anchor_Rs):
 
-        patch = patch_db.get_patch_from_key(patch).copy()
+        patch = patch_db.get_patch_from_key(key).copy()
         patch_xyz = np.vstack([patch["x"], patch["y"], patch["z"]]).T
 
         # align the lowest point of the patch to the anchor_xyz
@@ -179,16 +175,73 @@ def get_added_pcd(scene_pcd, add_info, return_splits=False):
 
         # update the patch's center
         patch["center"] = patch_xyz_world // voxel_size + 0.5 * voxel_size
-        patch = voxel_grid.unique_pcd(patch, voxel_size=voxel_size)
+
+        _, indices = voxel_grid.unique_pcd(
+            patch,
+            voxel_size=voxel_size,
+            return_indices=True,
+        )
 
         # get the patch points that are not overlapping with the scene_pcd
         # no need to unique the scene_pcd, as it is already unique
-        patch = voxel_grid.subtract_pcds(
-            patch,
+        _, mask = voxel_grid.subtract_pcds(
+            patch[indices],
             scene_pcd,
             voxel_size=voxel_size,
+            return_mask=True,
         )
 
+        merge_indices[key] = indices[mask]
+
+    return merge_indices
+
+
+def get_added_pcd(scene_pcd, add_info, return_splits=False):
+
+    if len(add_info) == 0:
+        if return_splits:
+            return np.empty(0, dtype=np.dtype(CLOUD_COMPARE_DTYPE)), []
+        return np.empty(0, dtype=np.dtype(CLOUD_COMPARE_DTYPE))
+
+    # extract information from add_info
+    patches = add_info["patches"]
+    anchor_xyzs = add_info["anchor_xyzs"]
+    anchor_euls = add_info["anchor_eulers"]
+    z_offset = add_info.get("z_offset", 0.0)
+    voxel_size = add_info.get("voxel_size", 0.2)
+
+    if "merge_indices" not in add_info:
+        # infer merge indices from the scene_pcd
+        merge_indices = infer_merge_indices(scene_pcd, add_info)
+    else:
+        merge_indices = add_info["merge_indices"]
+
+    assert len(patches) == len(anchor_xyzs) == len(anchor_euls)
+
+    anchor_Rs = utils.euler_to_R(anchor_euls)
+
+    added_pcd = []
+    for key, anchor_xyz, anchor_R in zip(patches, anchor_xyzs, anchor_Rs):
+
+        patch = patch_db.get_patch_from_key(key).copy()
+        patch_xyz = np.vstack([patch["x"], patch["y"], patch["z"]]).T
+
+        # align the lowest point of the patch to the anchor_xyz
+        i = np.argmin(patch_xyz[:, 2])
+        pos_diff = anchor_xyz - patch_xyz[i]
+        patch_xyz_world = patch_xyz @ anchor_R + pos_diff
+
+        # updated the patch coordinates to world coordinates
+        x, y, z = patch_xyz_world.T
+        patch["x"] = x
+        patch["y"] = y
+        patch["z"] = z + z_offset
+
+        # update the patch's center
+        patch["center"] = patch_xyz_world // voxel_size + 0.5 * voxel_size
+
+        # unique the patch and remove points that are already in the scene_pcd
+        patch = patch[merge_indices[key]]
         added_pcd.append(patch)
 
     splits = np.cumsum([len(i) for i in added_pcd])[:-1]

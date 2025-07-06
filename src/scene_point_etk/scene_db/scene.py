@@ -1,4 +1,5 @@
 import os
+import glob
 import pickle
 import shutil
 import matplotlib.pyplot as plt
@@ -92,19 +93,19 @@ class SceneDetailsMixin:
 
 class CameraSequenceMixin:
 
-    camera_sequence_filepath = ""
+    camera_seq_filepath = ""
 
     @property
     def camera_sequence(self):
         if hasattr(self, "_camera_sequence"):
             return self._camera_sequence
 
-        if not os.path.exists(self.camera_sequence_filepath):
+        if not os.path.exists(self.camera_seq_filepath):
             raise FileNotFoundError(
-                f"{self.camera_sequence_filepath} does not exist"
+                f"{self.camera_seq_filepath} does not exist"
             )
 
-        with open(self.camera_sequence_filepath, "rb") as f:
+        with open(self.camera_seq_filepath, "rb") as f:
             camera_sequence = pickle.load(f)
 
         self._camera_sequence = camera_sequence
@@ -116,7 +117,7 @@ class CameraSequenceMixin:
             raise TypeError("Expected CameraSequence object")
 
         self._camera_sequence = camera_sequence
-        with open(self.camera_sequence_filepath, "wb") as f:
+        with open(self.camera_seq_filepath, "wb") as f:
             pickle.dump(camera_sequence, f)
 
     @property
@@ -140,7 +141,7 @@ class CameraSequenceMixin:
         return filename
 
 
-class Scene(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
+class Basic(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
     """
     ├── <Scene ID 00>
     │   │
@@ -170,16 +171,82 @@ class Scene(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
     def __init__(self, scene_root, version):
 
         self.root = scene_root
-        self.scene_root = os.path.join(scene_root, version)
         self.version = version
+        self.scene_root = os.path.join(scene_root, version)
         self.cameras_root = os.path.join(self.scene_root, "cameras")
         os.makedirs(self.cameras_root, exist_ok=True)
 
-        self.scene_filepath = os.path.join(self.scene_root, "scene.pcd")
-        self.details_filepath = os.path.join(self.scene_root, "details.pkl")
-        self.camera_sequence_filepath = os.path.join(
-            self.cameras_root, "cam_sequence.pkl"
+        join = os.path.join
+        self.scene_filepath = join(self.scene_root, "scene.pcd")
+        self.details_filepath = join(self.scene_root, "details.pkl")
+        self.camera_seq_filepath = join(self.cameras_root, "cam_sequence.pkl")
+
+    def get_point_indices_map_by_camera(self, camera_name, verbose=True):
+
+        camera_root = os.path.join(self.cameras_root, camera_name)
+        point_indices_root = os.path.join(camera_root, "sparse_point_indices")
+        os.makedirs(point_indices_root, exist_ok=True)
+
+        existing_files = sorted(
+            glob.glob(
+                os.path.join(camera_root, "sparse_point_indices", "*.npy")
+            ),
+            key=lambda x: os.path.basename(x),
         )
+
+        if existing_files:
+            indices_maps = [np.load(f) for f in existing_files]
+            return np.array(indices_maps)
+
+        # Otherwise, compute from scratch
+        img_seq = self.camera_sequence.get_a_camera(camera_name)
+        intrinsic = img_seq.intrinsic
+        extrinsics = img_seq.extrinsic
+        xyz = self.pcd_xyz
+
+        H, W = img_seq.figsize
+        indices_maps = []
+
+        prog = utils.ProgressTimer(
+            prefix=f"Building indices {camera_name} ",
+            verbose=verbose,
+        )
+        prog.tic(len(img_seq))
+        for idx, extrinsic in enumerate(extrinsics):
+            index_map = utils_img.points_to_index_map(
+                xyz,
+                intrinsic,
+                extrinsic,
+                H,
+                W,
+                min_distance=0.0,
+                max_distance=np.inf,
+            )
+            indices_maps.append(index_map)
+            np.save(
+                os.path.join(
+                    point_indices_root, f"{img_seq.timestamps[idx]}.npy"
+                ),
+                index_map,
+            )
+            prog.toc()
+
+        return np.array(indices_maps)
+
+    @property
+    def point_indices_map(self):
+
+        if hasattr(self, "_point_indices_map"):
+            return self._point_indices_map
+
+        point_indices = {}
+        for camera in self.cameras:
+
+            indices = self.get_point_indices_map_by_camera(camera)
+            point_indices[camera] = indices
+
+        self._point_indices_map = point_indices
+        return self._point_indices_map.copy()
 
     def process_camera(self, camera_name):
 
@@ -315,7 +382,7 @@ class Scene(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
             shutil.copy(self.camera_sequence_filepath, path)
 
 
-class OriginalScene(Scene):
+class OriginalScene(Basic):
     """
     based on Scene structure, but with fixed scene name "GT" and added
     the following structure:
@@ -397,7 +464,7 @@ class OriginalScene(Scene):
         self._scene_pcd = pcd_data.copy()
 
 
-class EditedScene(Scene):
+class EditedScene(Basic):
     """
     based on Scene structure, but assume the GT scene is already processed
     and has the following structure:
@@ -841,107 +908,3 @@ class EditedScene(Scene):
         self.process_depth_images(camera_name)
         self.process_visual_source_masks(camera_name)
         self.process_visual_target_masks(camera_name)
-
-
-class SceneImageDataset(EditedScene):
-
-    VALID_KEYs = [
-        # GT image
-        "target_image",
-        # GT pcd scene
-        "target_depths",
-        "target_points",
-        "target_indices",
-        "target_sparse_changed_masks",
-        "target_dense_changed_masks",
-        # <version> pcd scene
-        "source_depths",
-        "source_points",
-        "source_indices",
-        "source_sparse_changed_masks",
-        "source_dense_changed_masks",
-    ]
-
-    def __init__(self, scene_root, version, return_keys=[]):
-
-        super().__init__(scene_root, version)
-
-        for key in return_keys:
-            if key not in self.VALID_KEYs:
-                msg = f"Invalid key: {key}. Valid keys are: {self.VALID_KEYs}"
-                raise ValueError(msg)
-
-        self.return_keys = return_keys
-        self.samples = self._collect_samples()
-        self.target_scene = OriginalScene(scene_root)
-        self.source_scene = EditedScene(scene_root, version)
-
-    def _initialize_paths(self, camera, filename):
-
-        f = os.path.join
-        t_prefix = os.path.join(self.target_scene.cameras_root, camera)
-        s_prefix = os.path.join(self.source_scene.cameras_root, camera)
-
-        scm = "sparse_changed_masks"
-        dcm = "dense_changed_masks"
-
-        png = str(filename) + ".png"
-        npy = str(filename) + ".npy"
-
-        R = {
-            "target_image": f(t_prefix, "images", png),
-            "target_depths": f(t_prefix, "sparse_depths", npy),
-            "target_points": f(t_prefix, "sparse_point_map", npy),
-            "target_indices": f(t_prefix, "sparse_point_indices", npy),
-            "target_sparse_changed_masks": f(s_prefix, scm, "target", png),
-            "target_dense_changed_masks": f(s_prefix, dcm, "target", png),
-            "source_depths": f(s_prefix, "sparse_depths", npy),
-            "source_points": f(s_prefix, "sparse_point_map", npy),
-            "source_indices": f(s_prefix, "sparse_point_indices", npy),
-            "source_sparse_changed_masks": f(s_prefix, scm, "source", png),
-            "source_dense_changed_masks": f(s_prefix, dcm, "source", png),
-        }
-
-        return R
-
-    def _collect_samples(self):
-
-        samples = []
-
-        camera_sequence = self.source_scene.camera_sequence
-        for camera in camera_sequence.list_cameras():
-
-            filenames = camera_sequence.get_a_camera(camera).timestamps
-            for filename in filenames:
-
-                paths = self._initialize_paths(camera, filename)
-                sample = [paths[key] for key in self.return_keys]
-                samples.append(sample)
-
-        return samples
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, idx):
-
-        paths = self.samples[idx]
-        data = {}
-
-        for key, path in zip(self.return_keys, paths):
-
-            if key == "target_image":
-                data[key] = np.array(Image.open(path).convert("RGB")) / 255.0
-                continue
-
-            if os.path.splitext(path)[1] == ".png":
-                data[key] = np.array(Image.open(path).convert("L"))
-                continue
-
-            if os.path.splitext(path)[1] == ".npy":
-                data[key] = np.load(path)
-                continue
-
-            raise ValueError(f"Unsupported key: {key}")
-
-        return data

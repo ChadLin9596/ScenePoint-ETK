@@ -118,6 +118,10 @@ def make_add_info(
         "voxel_size": voxel_size,
     }
 
+    original_scene = scene_db.OriginalScene(log_id)
+    m_ind = scene_db.infer_merge_indices(original_scene.scene_pcd, add_info)
+    add_info["merge_indices"] = m_ind
+
     return add_info
 
 

@@ -6,6 +6,7 @@ from .diff_scene import (
     get_deleted_pcd,
     get_added_pcd,
     apply_change_info_to_target_pcd,
+    infer_merge_indices,
 )
 
 SCENE_ROOT = ""
@@ -80,10 +81,10 @@ def get_scene_path_by_id(scene_id):
     return SCENE_MAP[scene_id]["path"]
 
 
-class Scene(scene.Scene):
+# class Scene(scene.Scene):
 
-    def __init__(self, scene_id, version):
-        super().__init__(os.path.join(SCENE_ROOT, scene_id), version)
+#     def __init__(self, scene_id, version):
+#         super().__init__(os.path.join(SCENE_ROOT, scene_id), version)
 
 
 class OriginalScene(scene.OriginalScene):
