@@ -62,6 +62,9 @@ camera_sequence_params:
 
 edit_scene_prefix: "v0."
 
+ground_filter_params:
+    threshold: 0.5  # meters
+
 ########################
 # develope and testing #
 ########################
