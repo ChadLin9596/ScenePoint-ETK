@@ -15,102 +15,14 @@ import py_utils.utils as utils
 import py_utils.utils_img as utils_img
 import py_utils.visualization_pptk as vis_pptk
 
-
-def _cluster_overlapping_lists(lists_of_indices):
-    parent = {}
-
-    def find(x):
-        parent.setdefault(x, x)
-        if parent[x] != x:
-            parent[x] = find(parent[x])
-        return parent[x]
-
-    def union(x, y):
-        parent[find(x)] = find(y)
-
-    # Step 1: Union all overlapping values
-    for group in lists_of_indices:
-        for i in range(1, len(group)):
-            union(group[i - 1], group[i])
-
-    # Step 2: Group by root
-    clusters = {}
-    for group in lists_of_indices:
-        for item in group:
-            root = find(item)
-            if root not in clusters:
-                clusters[root] = set()
-            clusters[root].add(item)
-
-    return list(clusters.values())
+#########
+# Mixin #
+#########
 
 
-def filter_visible(
-    static_depth_map,  # (H, W)
-    lidar_depth_map,  # (H, W)
-    overall_dense_mask,  # (H, W) boolean mask of dense points
-    neighborhood_size=3,  # Size of neighborhood for depth comparison
-    depth_threshold=0.1,  # Depth threshold for visibility
-    num_valid_points=1,
-):
+class ScenePCDMixin:
 
-    pad = neighborhood_size // 2
-
-    valid_static = static_depth_map > 0
-    valid_lidar = lidar_depth_map > 0
-    visible_mask = overall_dense_mask & valid_static
-
-    H, W = static_depth_map.shape
-
-    us, vs = np.argwhere(visible_mask).T
-    for u, v in zip(us, vs):
-        u_min = max(0, u - pad)
-        u_max = min(H, u + pad + 1)
-        v_min = max(0, v - pad)
-        v_max = min(W, v + pad + 1)
-
-        lidar_patch = lidar_depth_map[u_min:u_max, v_min:v_max]
-        valid_lidar_patch = lidar_patch[lidar_patch > 0]
-
-        if len(valid_lidar_patch) < num_valid_points:
-            continue
-
-        lidar_depth = np.min(valid_lidar_patch)
-        static_depth = static_depth_map[u, v]
-
-        if (static_depth - lidar_depth) > depth_threshold:
-            visible_mask[u, v] = False
-
-    return visible_mask
-
-
-class PCDScene:
-    """
-    ├── <Scene ID 00>
-    │   │
-    │   └── <version name>
-    │       ├── details.pkl
-    │       └── scene.pcd
-    │
-    ├── <Scene ID 01>
-    └── ...
-    """
-
-    def __init__(self, scene_root, version):
-
-        self.root = scene_root
-        self.scene_root = os.path.join(scene_root, version)
-        self.version = version
-
-        os.makedirs(self.scene_root, exist_ok=True)
-
-    @property
-    def scene_filepath(self):
-        return os.path.join(self.scene_root, "scene.pcd")
-
-    @property
-    def details_filepath(self):
-        return os.path.join(self.scene_root, "details.pkl")
+    scene_filepath = ""
 
     @property
     def scene_pcd(self):
@@ -159,6 +71,11 @@ class PCDScene:
         r, g, b, a = scene_utils.decode_rgba(p["rgb"])
         return np.vstack([r, g, b]).T
 
+
+class SceneDetailsMixin:
+
+    details_filepath = ""
+
     @property
     def scene_details(self):
         if not os.path.exists(self.details_filepath):
@@ -173,11 +90,63 @@ class PCDScene:
             pickle.dump(details, fd)
 
 
-class Scene(PCDScene):
+class CameraSequenceMixin:
+
+    camera_sequence_filepath = ""
+
+    @property
+    def camera_sequence(self):
+        if hasattr(self, "_camera_sequence"):
+            return self._camera_sequence
+
+        if not os.path.exists(self.camera_sequence_filepath):
+            raise FileNotFoundError(
+                f"{self.camera_sequence_filepath} does not exist"
+            )
+
+        with open(self.camera_sequence_filepath, "rb") as f:
+            camera_sequence = pickle.load(f)
+
+        self._camera_sequence = camera_sequence
+        return self._camera_sequence
+
+    @camera_sequence.setter
+    def camera_sequence(self, camera_sequence):
+        if not isinstance(camera_sequence, argoverse2.CameraSequence):
+            raise TypeError("Expected CameraSequence object")
+
+        self._camera_sequence = camera_sequence
+        with open(self.camera_sequence_filepath, "wb") as f:
+            pickle.dump(camera_sequence, f)
+
+    @property
+    def cameras(self):
+        return self.camera_sequence.list_cameras()
+
+    def get_camera_filenames(self, camera_name):
+        camera_sequence = self.camera_sequence.get_a_camera(camera_name)
+        return list(map(str, camera_sequence.timestamps))
+
+    def _initialize_cam_fnames(self, camera_name, filename_or_index):
+
+        if isinstance(filename_or_index, int):
+            ind = filename_or_index
+            filename_or_index = self.get_camera_filenames(camera_name)[ind]
+
+        assert isinstance(filename_or_index, str)
+        filename = filename_or_index.replace(".npy", "")
+        filename = filename.replace(".png", "")
+        filename = filename.replace(".jpg", "")
+        return filename
+
+
+class Scene(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
     """
     ├── <Scene ID 00>
     │   │
     │   └── <version name>
+    │       ├── details.pkl
+    │       ├── scene.pcd
     │       └── cameras
     │           ├── cam_sequence.pkl
     │           ├── <camera name 1>
@@ -200,45 +169,17 @@ class Scene(PCDScene):
 
     def __init__(self, scene_root, version):
 
-        super().__init__(scene_root, version)
-
+        self.root = scene_root
+        self.scene_root = os.path.join(scene_root, version)
+        self.version = version
         self.cameras_root = os.path.join(self.scene_root, "cameras")
         os.makedirs(self.cameras_root, exist_ok=True)
 
-    @property
-    def camera_sequence_filepath(self):
-        return os.path.join(self.cameras_root, "cam_sequence.pkl")
-
-    @property
-    def camera_sequence(self):
-
-        if hasattr(self, "_camera_sequence"):
-            return self._camera_sequence
-
-        # load camera sequence from file
-        path = self.camera_sequence_filepath
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"{path} does not exist")
-
-        with open(path, "rb") as f:
-            camera_sequence = pickle.load(f)
-
-        self._camera_sequence = camera_sequence
-        return self._camera_sequence
-
-    @camera_sequence.setter
-    def camera_sequence(self, camera_sequence):
-
-        if not isinstance(camera_sequence, argoverse2.CameraSequence):
-            raise TypeError("Expected CameraSequence object")
-
-        self._camera_sequence = camera_sequence
-        with open(self.camera_sequence_filepath, "wb") as f:
-            pickle.dump(camera_sequence, f)
-
-    @property
-    def cameras(self):
-        return self.camera_sequence.list_cameras()
+        self.scene_filepath = os.path.join(self.scene_root, "scene.pcd")
+        self.details_filepath = os.path.join(self.scene_root, "details.pkl")
+        self.camera_sequence_filepath = os.path.join(
+            self.cameras_root, "cam_sequence.pkl"
+        )
 
     def process_camera(self, camera_name):
 
@@ -290,22 +231,6 @@ class Scene(PCDScene):
             np.save(os.path.join(point_indices_root, name), indices_map)
 
             prog.toc()
-
-    def get_camera_filenames(self, camera_name):
-        camera_sequence = self.camera_sequence.get_a_camera(camera_name)
-        return list(map(str, camera_sequence.timestamps))
-
-    def _initialize_cam_fnames(self, camera_name, filename_or_index):
-
-        if isinstance(filename_or_index, int):
-            ind = filename_or_index
-            filename_or_index = self.get_camera_filenames(camera_name)[ind]
-
-        assert isinstance(filename_or_index, str)
-        filename = filename_or_index.replace(".npy", "")
-        filename = filename.replace(".png", "")
-        filename = filename.replace(".jpg", "")
-        return filename
 
     def get_a_sparse_depth(self, camera_name, filename_or_index):
 
@@ -735,7 +660,7 @@ class EditedScene(Scene):
             for indices in results:
                 deleted_inds.append(tgt_inds[indices])
 
-        deleted_inds = _cluster_overlapping_lists(deleted_inds)
+        deleted_inds = scene_utils.cluster_overlapping_lists(deleted_inds)
         deleted_inds = [np.sort(list(ind)) for ind in deleted_inds]
 
         image_sequence = self.camera_sequence.get_a_camera(camera_name)
@@ -772,12 +697,12 @@ class EditedScene(Scene):
                 valid = np.isin(ind_map_tgt[valid_tgt], indices)
 
                 sp_mask[valid_tgt] |= valid
-                sp_mask = filter_visible(
-                    static_depth_map=depth_map,
-                    lidar_depth_map=sweep_depth_map,
-                    overall_dense_mask=sp_mask,
-                    neighborhood_size=5,
-                    num_valid_points=2,
+                sp_mask = scene_utils.filter_visible(
+                    depth_map,
+                    sweep_depth_map,
+                    sp_mask,
+                    neighborhood_size=7,
+                    num_valid_points=3,
                 )
                 de_mask = utils_img.fill_sparse_boolean_by_convex_hull(sp_mask)
 
@@ -841,7 +766,7 @@ class EditedScene(Scene):
             for indices in results:
                 deleted_inds.append(tgt_inds[indices])
 
-        deleted_inds = _cluster_overlapping_lists(deleted_inds)
+        deleted_inds = scene_utils.cluster_overlapping_lists(deleted_inds)
         deleted_inds = [np.sort(list(ind)) for ind in deleted_inds]
 
         image_sequence = self.camera_sequence.get_a_camera(camera_name)
@@ -878,12 +803,12 @@ class EditedScene(Scene):
                 valid = np.isin(ind_map_tgt[valid_tgt], indices)
 
                 sp_mask[valid_tgt] |= valid
-                sp_mask = filter_visible(
-                    static_depth_map=depth_map,
-                    lidar_depth_map=sweep_depth_img,
-                    overall_dense_mask=sp_mask,
-                    neighborhood_size=5,
-                    num_valid_points=2,
+                sp_mask = scene_utils.filter_visible(
+                    depth_map,
+                    sweep_depth_img,
+                    sp_mask,
+                    neighborhood_size=7,
+                    num_valid_points=3,
                 )
                 sparse_change_masks.append(sp_mask)
                 de_mask = utils_img.fill_sparse_boolean_by_convex_hull(sp_mask)

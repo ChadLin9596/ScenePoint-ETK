@@ -8,6 +8,7 @@ from .ground_process import (
 from .clustering import (
     cluster_voxel_grid_by_DBSCAN,
     filter_voxel_grid_by_DBSCAN,
+    cluster_overlapping_lists,
 )
 
 
@@ -76,3 +77,81 @@ def decode_rgba(bgra):
         a = a / 255.0
 
     return r, g, b, a
+
+
+def filter_visible(
+    bg_depth_image,  # (H, W)
+    fg_depth_image,  # (H, W)
+    FOV_mask,  # (H, W) boolean mask of dense points
+    neighborhood_size=7,  # Size of neighborhood for depth comparison
+    depth_threshold=0.1,  # Depth threshold for visibility
+    num_valid_points=3,
+):
+
+    assert bg_depth_image.shape == fg_depth_image.shape
+    assert FOV_mask.shape == bg_depth_image.shape
+
+    pad = neighborhood_size // 2
+
+    H, W = FOV_mask.shape
+    FOV_mask = FOV_mask & (bg_depth_image > 0)
+
+    us, vs = np.argwhere(FOV_mask).T
+    for u, v in zip(us, vs):
+        u_min = max(0, u - pad)
+        u_max = min(H, u + pad + 1)
+        v_min = max(0, v - pad)
+        v_max = min(W, v + pad + 1)
+
+        depth_patch = fg_depth_image[u_min:u_max, v_min:v_max]
+        valid_patch = depth_patch[depth_patch > 0]
+
+        if len(valid_patch) < num_valid_points:
+            continue
+
+        bg_depth = bg_depth_image[u, v]
+        fg_depth = np.min(valid_patch)
+
+        if (bg_depth - fg_depth) <= depth_threshold:
+            FOV_mask[u, v] = False
+
+    return FOV_mask
+
+
+def filter_visible_old(
+    static_depth_map,  # (H, W)
+    lidar_depth_map,  # (H, W)
+    overall_sparse_mask,  # (H, W) boolean mask of dense points
+    neighborhood_size=3,  # Size of neighborhood for depth comparison
+    depth_threshold=0.1,  # Depth threshold for visibility
+    num_valid_points=1,
+):
+
+    pad = neighborhood_size // 2
+
+    valid_static = static_depth_map > 0
+    valid_lidar = lidar_depth_map > 0
+    visible_mask = overall_sparse_mask & valid_static
+
+    H, W = static_depth_map.shape
+
+    us, vs = np.argwhere(visible_mask).T
+    for u, v in zip(us, vs):
+        u_min = max(0, u - pad)
+        u_max = min(H, u + pad + 1)
+        v_min = max(0, v - pad)
+        v_max = min(W, v + pad + 1)
+
+        lidar_patch = lidar_depth_map[u_min:u_max, v_min:v_max]
+        valid_lidar_patch = lidar_patch[lidar_patch > 0]
+
+        if len(valid_lidar_patch) < num_valid_points:
+            continue
+
+        lidar_depth = np.min(valid_lidar_patch)
+        static_depth = static_depth_map[u, v]
+
+        if (static_depth - lidar_depth) > depth_threshold:
+            visible_mask[u, v] = False
+
+    return visible_mask

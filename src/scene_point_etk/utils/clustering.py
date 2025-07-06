@@ -54,3 +54,32 @@ def filter_voxel_grid_by_DBSCAN(
     if return_details:
         return cluster_pcd, details
     return cluster_pcd
+
+
+def cluster_overlapping_lists(lists_of_indices):
+    parent = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        if parent[x] != x:
+            parent[x] = find(parent[x])
+        return parent[x]
+
+    def union(x, y):
+        parent[find(x)] = find(y)
+
+    # Step 1: Union all overlapping values
+    for group in lists_of_indices:
+        for i in range(1, len(group)):
+            union(group[i - 1], group[i])
+
+    # Step 2: Group by root
+    clusters = {}
+    for group in lists_of_indices:
+        for item in group:
+            root = find(item)
+            if root not in clusters:
+                clusters[root] = set()
+            clusters[root].add(item)
+
+    return list(clusters.values())
