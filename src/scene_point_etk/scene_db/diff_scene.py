@@ -113,7 +113,7 @@ def infer_merge_indices(scene_pcd, add_info):
 
 def get_added_pcd(scene_pcd, add_info, return_splits=False):
 
-    if len(add_info) == 0:
+    if len(add_info) == 0 or len(add_info["patches"]) == 0:
         if return_splits:
             return np.empty(0, dtype=np.dtype(CLOUD_COMPARE_DTYPE)), []
         return np.empty(0, dtype=np.dtype(CLOUD_COMPARE_DTYPE))
