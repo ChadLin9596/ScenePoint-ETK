@@ -27,6 +27,7 @@ def main(args):
         print(json.dumps(args, indent=4))
 
     ground_filter_threshold = args["ground_filter_params"]["threshold"]
+    bbox_margin = args["bbox_params"]["bbox_margin"]
 
     for log_id in scene_db.list_scene_ids():
 
@@ -52,7 +53,12 @@ def main(args):
             # if any non_ground points are in the added bounding boxes
             # remove the added pcd
             deleted_index = []
-            for n, bbox in enumerate(edited_scene.deleted_bounding_boxes):
+
+            scene_details = edited_scene.scene_details
+            bboxes = edited_scene.added_bounding_boxes(margin=bbox_margin)
+            assert len(bboxes) == len(scene_details["add"]["patches"])
+
+            for n, bbox in enumerate(bboxes):
                 M = utils.points_in_a_bounding_box(
                     origin_scene.pcd_xyz[non_ground],
                     bbox,
@@ -63,20 +69,12 @@ def main(args):
             if len(deleted_index) == 0:
                 continue
 
-            scene_details = edited_scene.scene_details
             add_info = scene_details.pop("add")
-
-            if "merge_indices" not in add_info:
-                print("infer merge indices")
-                add_info["merge_indices"] = scene_db.infer_merge_indices(
-                    origin_scene.scene_pcd,
-                    add_info,
-                )
-
             new_add = {
                 "patches": [],
                 "anchor_xyzs": [],
                 "anchor_eulers": [],
+                "merge_indices": [],
                 "z_offset": add_info.get("z_offset", 0.0),
                 "voxel_size": add_info.get("voxel_size", 0.2),
             }
@@ -89,15 +87,15 @@ def main(args):
                 patch = add_info["patches"][n]
                 xyz = add_info["anchor_xyzs"][n]
                 euler = add_info["anchor_eulers"][n]
+                merge_indices = add_info["merge_indices"][n]
+
                 new_add["patches"].append(patch)
                 new_add["anchor_xyzs"].append(xyz)
                 new_add["anchor_eulers"].append(euler)
+                new_add["merge_indices"].append(merge_indices)
 
             new_add["anchor_xyzs"] = np.array(new_add["anchor_xyzs"])
             new_add["anchor_eulers"] = np.array(new_add["anchor_eulers"])
-            new_add["merge_indices"] = {
-                p: add_info["merge_indices"][p] for p in new_add["patches"]
-            }
             scene_details["add"] = new_add
 
             old_path = edited_scene.details_filepath
@@ -108,6 +106,18 @@ def main(args):
             a = len(add_info["patches"])
             b = len(new_add["patches"])
             print(f"Scene {log_id} -> {version} from {a} to {b} patches.")
+
+            added_pcds = edited_scene.added_pcds
+            deleted_pcds = edited_scene.deleted_pcds
+            if len(added_pcds) == 0 and len(deleted_pcds) == 0:
+                msg = f"Scene {log_id} -> {version} doesn't change."
+                print(msg)
+
+            # re-apply the change info to the target pcd
+            edited_scene.scene_pcd = scene_db.apply_change_info_to_target_pcd(
+                origin_scene.scene_pcd,
+                edited_scene.scene_details,
+            )
 
 
 def parser_args():

@@ -248,8 +248,7 @@ class EditedDetailsMixin:
     def added_indices(self):
         return self.edited_details["added_segment_indices_of_source"]
 
-    @property
-    def added_bounding_boxes(self):
+    def added_bounding_boxes(self, margin=0.0):
 
         bounding_boxes = []
         for pcds in self.added_pcds:
@@ -261,18 +260,24 @@ class EditedDetailsMixin:
             x_min, y_min, z_min = np.min(xyz, axis=0)
             x_max, y_max, z_max = np.max(xyz, axis=0)
 
-            lx = x_max - x_min
-            ly = y_max - y_min
-            lz = z_max - z_min
+            lx = x_max - x_min + margin
+            ly = y_max - y_min + margin
+            lz = z_max - z_min + margin
+
+            # visualization_pptk.make_bounding_box_vertices will return bbox
+            # whose center is at (0, 0, 0) so we need to offset it to the
+            # correct position
+            off = np.r_[x_min, y_min, z_min] - (-1.0 * np.r_[lx, ly, lz] / 2.0)
 
             # (8, 3)
             vertice = visualization_pptk.make_bounding_box_vertices(lx, ly, lz)
+            vertice += off
+
             vertice = np.sum(vertice[:, None, :] * R.T, axis=-1) + mean
             bounding_boxes.append(vertice)
         return bounding_boxes
 
-    @property
-    def deleted_bounding_boxes(self):
+    def deleted_bounding_boxes(self, margin=0.0):
 
         bounding_boxes = []
         for pcds in self.deleted_pcds:
@@ -284,12 +289,18 @@ class EditedDetailsMixin:
             x_min, y_min, z_min = np.min(xyz, axis=0)
             x_max, y_max, z_max = np.max(xyz, axis=0)
 
-            lx = x_max - x_min
-            ly = y_max - y_min
-            lz = z_max - z_min
+            lx = x_max - x_min + margin
+            ly = y_max - y_min + margin
+            lz = z_max - z_min + margin
+
+            # visualization_pptk.make_bounding_box_vertices will return bbox
+            # whose center is at (0, 0, 0) so we need to offset it to the
+            # correct position
+            off = np.r_[x_min, y_min, z_min] - (-1.0 * np.r_[lx, ly, lz] / 2.0)
 
             # (8, 3)
             vertice = visualization_pptk.make_bounding_box_vertices(lx, ly, lz)
+            vertice = vertice + off
             vertice = np.sum(vertice[:, None, :] * R.T, axis=-1) + mean
             bounding_boxes.append(vertice)
         return bounding_boxes

@@ -118,6 +118,9 @@ def make_add_info(
         "voxel_size": voxel_size,
     }
 
+    # infer_merge_indices will take some time to check which indices are going
+    # to be merged into the original scene. We store the indices in `add_info`
+    # to save the time when applying the change_info to the original scene.`
     original_scene = scene_db.OriginalScene(log_id)
     m_ind = scene_db.infer_merge_indices(original_scene.scene_pcd, add_info)
     add_info["merge_indices"] = m_ind

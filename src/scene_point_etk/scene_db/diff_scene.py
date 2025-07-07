@@ -67,9 +67,11 @@ def infer_merge_indices(scene_pcd, add_info):
     z_offset = add_info.get("z_offset", 0.0)
     voxel_size = add_info.get("voxel_size", 0.2)
 
+    assert len(patches) == len(anchor_xyzs) == len(anchor_euls)
+
     anchor_Rs = utils.euler_to_R(anchor_euls)
 
-    merge_indices = {}
+    merge_indices = []
     for key, anchor_xyz, anchor_R in zip(patches, anchor_xyzs, anchor_Rs):
 
         patch = patch_db.get_patch_from_key(key).copy()
@@ -104,7 +106,7 @@ def infer_merge_indices(scene_pcd, add_info):
             return_mask=True,
         )
 
-        merge_indices[key] = indices[mask]
+        merge_indices.append(indices[mask])
 
     return merge_indices
 
@@ -120,21 +122,19 @@ def get_added_pcd(scene_pcd, add_info, return_splits=False):
     patches = add_info["patches"]
     anchor_xyzs = add_info["anchor_xyzs"]
     anchor_euls = add_info["anchor_eulers"]
+    merge_indices = add_info["merge_indices"]
     z_offset = add_info.get("z_offset", 0.0)
     voxel_size = add_info.get("voxel_size", 0.2)
 
-    if "merge_indices" not in add_info:
-        # infer merge indices from the scene_pcd
-        merge_indices = infer_merge_indices(scene_pcd, add_info)
-    else:
-        merge_indices = add_info["merge_indices"]
-
     assert len(patches) == len(anchor_xyzs) == len(anchor_euls)
+    assert len(patches) == len(merge_indices)
 
     anchor_Rs = utils.euler_to_R(anchor_euls)
 
     added_pcd = []
-    for key, anchor_xyz, anchor_R in zip(patches, anchor_xyzs, anchor_Rs):
+    for key, anchor_xyz, anchor_R, merge_ind in zip(
+        patches, anchor_xyzs, anchor_Rs, merge_indices
+    ):
 
         patch = patch_db.get_patch_from_key(key).copy()
         patch_xyz = np.vstack([patch["x"], patch["y"], patch["z"]]).T
@@ -154,7 +154,7 @@ def get_added_pcd(scene_pcd, add_info, return_splits=False):
         patch["center"] = patch_xyz_world // voxel_size + 0.5 * voxel_size
 
         # unique the patch and remove points that are already in the scene_pcd
-        patch = patch[merge_indices[key]]
+        patch = patch[merge_ind]
         added_pcd.append(patch)
 
     splits = np.cumsum([len(i) for i in added_pcd])[:-1]
