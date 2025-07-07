@@ -273,6 +273,17 @@ class OriginalScene(Basic):
         pcd.write(self.scene_filepath, pcd_data)
         self._scene_pcd = pcd_data.copy()
 
+    @property
+    def raw_lidar_sweeps(self):
+        if hasattr(self, "_raw_lidar_sweeps"):
+            return self._raw_lidar_sweeps
+
+        ss = self.scene_details["sweeps"]
+        ss = [argoverse2.Sweep(s.filepath, coordinate="map") for s in ss]
+        self._raw_lidar_sweeps = ss
+
+        return self._raw_lidar_sweeps
+
 
 class EditedScene(Basic, EditedDetailsMixin):
     """
