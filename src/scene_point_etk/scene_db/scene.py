@@ -368,22 +368,68 @@ class EditedScene(Basic, EditedDetailsMixin):
         self._scene_pcd = pcd_data.copy()
 
     @property
-    def bounding_boxes(self):
+    def raw_lidar_sweeps(self):
+        if hasattr(self, "_raw_lidar_sweeps"):
+            return self._raw_lidar_sweeps
 
-        orig_scene = OriginalScene(self.root)
-        details = self.scene_details
+        ss = OriginalScene(self.root).scene_details["sweeps"]
+        ss = [argoverse2.Sweep(s.filepath, coordinate="map") for s in ss]
+        self._raw_lidar_sweeps = ss
 
-        add_info = details.get("add", {})
-        delete_info = details.get("delete", {})
+        return self._raw_lidar_sweeps
 
-        results = {
-            "add": diff_scene.get_added_pcd_bounding_boxes(add_info),
-            "delete": diff_scene.get_deleted_pcd_bounding_boxes(
-                orig_scene.scene_pcd, delete_info
-            ),
-        }
+    @property
+    def unchanged_lidar_sweeps(self):
+        if hasattr(self, "_unchanged_lidar_sweeps"):
+            return self._unchanged_lidar_sweeps
 
-        return results
+        scene_details = OriginalScene(self.root).scene_details
+        ss = argoverse2.SweepSequence.from_sweeps(scene_details["sweeps"])
+
+        _, details = ss.export_to_voxel_grid(
+            voxel_size=scene_details.get("voxel_size", 0.2),
+            skip_color=True,
+            return_details=True,
+        )
+        original_indices = np.arange(len(ss.xyz))
+        original_indices = original_indices[details["indices"]]
+        original_indicess = np.split(original_indices, details["splits"][1:-1])
+
+        selected = []
+        for i in self.edited_details["deleted_indices_of_target"]:
+            selected.append(original_indicess[i])
+        selected = np.sort(np.hstack(selected))
+
+        sweep_starts = np.r_[0, np.cumsum([len(s) for s in ss.sweeps])]
+        starts = np.searchsorted(sweep_starts, selected, side="right") - 1
+        splits = np.where(np.diff(starts) > 0)[0] + 1
+
+        # to local indices
+        selected = selected - sweep_starts[starts]
+        selecteds = np.split(selected, splits)
+
+        self._unchanged_lidar_sweeps = []
+        for sweep, selected in zip(ss.sweeps, selecteds):
+
+            unchanged_sweep = sweep - sweep[selected]
+            self._unchanged_lidar_sweeps.append(unchanged_sweep)
+
+        return self._unchanged_lidar_sweeps
+
+    @property
+    def changed_lidar_sweeps(self):
+        if hasattr(self, "_changed_lidar_sweeps"):
+            return self._changed_lidar_sweeps
+
+        raws = self.raw_lidar_sweeps
+        unchangeds = self.unchanged_lidar_sweeps
+
+        self._changed_lidar_sweeps = []
+        for raw, unchanged in zip(raws, unchangeds):
+            changed_sweep = raw - unchanged
+            self._changed_lidar_sweeps.append(changed_sweep)
+
+        return self._changed_lidar_sweeps
 
     def process_source_masks(self, camera_name):
 

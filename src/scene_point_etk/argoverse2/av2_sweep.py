@@ -121,6 +121,10 @@ class Sweep(ArgoMixin, array_data.Array):
         return self[I]
 
     @property
+    def filepath(self):
+        return self._path
+
+    @property
     def xyz(self):
 
         if hasattr(self, "_xyz"):
