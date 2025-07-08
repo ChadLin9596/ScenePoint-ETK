@@ -253,7 +253,11 @@ class EditedDetailsMixin:
         bounding_boxes = []
         for pcds in self.added_pcds:
 
+            if len(pcds) == 0:
+                continue
+
             xyz = np.vstack([pcds["x"], pcds["y"], pcds["z"]]).T
+
             R, mean = scene_utils.modified_pcd_projection(xyz)
 
             xyz = np.sum((xyz - mean)[:, None, :] * R, axis=-1)
@@ -281,6 +285,9 @@ class EditedDetailsMixin:
 
         bounding_boxes = []
         for pcds in self.deleted_pcds:
+
+            if len(pcds) == 0:
+                continue
 
             xyz = np.vstack([pcds["x"], pcds["y"], pcds["z"]]).T
             R, mean = scene_utils.modified_pcd_projection(xyz)

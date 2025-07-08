@@ -406,6 +406,10 @@ class EditedScene(Basic, EditedDetailsMixin):
         original_indices = original_indices[details["indices"]]
         original_indicess = np.split(original_indices, details["splits"][1:-1])
 
+        if len(self.edited_details["deleted_indices_of_target"]) == 0:
+            self._unchanged_lidar_sweeps = ss.sweeps
+            return self._unchanged_lidar_sweeps
+
         selected = []
         for i in self.edited_details["deleted_indices_of_target"]:
             selected.append(original_indicess[i])
@@ -414,16 +418,19 @@ class EditedScene(Basic, EditedDetailsMixin):
         sweep_starts = np.r_[0, np.cumsum([len(s) for s in ss.sweeps])]
         starts = np.searchsorted(sweep_starts, selected, side="right") - 1
         splits = np.where(np.diff(starts) > 0)[0] + 1
+        splits = np.r_[0, splits, len(starts)]
 
         # to local indices
         selected = selected - sweep_starts[starts]
-        selecteds = np.split(selected, splits)
 
-        self._unchanged_lidar_sweeps = []
-        for sweep, selected in zip(ss.sweeps, selecteds):
+        self._unchanged_lidar_sweeps = ss.sweeps
 
-            unchanged_sweep = sweep - sweep[selected]
-            self._unchanged_lidar_sweeps.append(unchanged_sweep)
+        for i, j in zip(splits[:-1], splits[1:]):
+
+            s = starts[i]
+            sweep = ss.sweeps[s]
+            unchanged_sweep = sweep - sweep[selected[i:j]]
+            self._unchanged_lidar_sweeps[s] = unchanged_sweep
 
         return self._unchanged_lidar_sweeps
 

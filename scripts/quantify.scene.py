@@ -6,12 +6,6 @@ import numpy as np
 
 def main():
 
-    log_and_version = []
-    for log_id in log_ids:
-        versions = scene_db.list_versions_by_scene_id(log_id)
-        for version in versions:
-            log_and_version.append((log_id, version))
-
     num_raw_sweep_points = 0
 
     num_raw_images = 0
@@ -46,8 +40,8 @@ def main():
         num_t1_voxelized_points += len(origin_scene.scene_pcd)
         num_t1_scene += 1
 
-        cam_seq = origin_scene.camera_sequences
-        for camera in cam_seq.cameras:
+        cam_seq = origin_scene.camera_sequence
+        for camera in cam_seq.list_cameras():
             num_raw_images += len(cam_seq.get_a_camera(camera))
 
         for version in scene_db.list_versions_by_scene_id(log_id):
@@ -64,13 +58,15 @@ def main():
                 [len(i) for i in edited_scene.changed_lidar_sweeps]
             )
 
-            num_t1_voxelized_changed_mask += np.unique(
-                np.hstack(edited_scene.deleted_indices)
-            )
+            if len(edited_scene.deleted_indices) != 0:
+                num_t1_voxelized_changed_mask += len(
+                    np.unique(np.hstack(edited_scene.deleted_indices))
+                )
 
-            num_t0_voxelized_changed_mask += np.unique(
-                np.hstack(edited_scene.added_indices)
-            )
+            if len(edited_scene.added_indices) != 0:
+                num_t0_voxelized_changed_mask += len(
+                    np.unique(np.hstack(edited_scene.added_indices))
+                )
 
             num_added_bounding_boxes += len(
                 edited_scene.added_bounding_boxes()
