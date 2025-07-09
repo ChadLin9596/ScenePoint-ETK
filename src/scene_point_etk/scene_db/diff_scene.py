@@ -11,6 +11,7 @@ add_info:{
     "patches": <list of patch keys> (n),
     "anchor_xyzs": (n, 3) array,
     "anchor_eulers": (n, 3) array,
+    "merge_indices": <list of int array> (n),
     "z_offset": <float> (optional, default 0.0)
     "voxel_size": <float> (optional, default 0.2)
 }
@@ -47,9 +48,9 @@ def get_deleted_pcd(scene_pcd, delete_info, return_mask=False):
         mask[indices] = True
 
     # delete by indices:
-    indices = np.r_[delete_info["indices"]]
-    indices = np.unique(indices).astype(np.int64)
-    mask[indices] = True
+    for indices in delete_info.get("indices", []):
+        indices = np.unique(indices).astype(np.int64)
+        mask[indices] = True
 
     if return_mask:
         return scene_pcd[mask], mask

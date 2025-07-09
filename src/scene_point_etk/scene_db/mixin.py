@@ -217,16 +217,31 @@ class EditedDetailsMixin:
         if hasattr(self, "_deleted_indices"):
             return self._deleted_indices
 
+        self._deleted_indices = []
+
         deleted_pcd = self.edited_details["deleted_points"]
         deleted_ind = self.edited_details["deleted_indices_of_target"]
 
+        deleted_indices = self.scene_details["delete"].get("indices", [])
+        if len(deleted_indices) > 0:
+            self._deleted_indices.extend(deleted_indices)
+
+            for del_ind in deleted_indices:
+                del_ind = np.sort(del_ind)
+                I = np.searchsorted(deleted_ind, del_ind, side="left")
+                M = np.ones(len(deleted_ind), dtype=bool)
+                M[I] = False
+                deleted_pcd = deleted_pcd[M]
+                deleted_ind = deleted_ind[M]
+
         if len(deleted_pcd) == 0:
-            self._deleted_indices = []
             return self._deleted_indices
 
         deleted_det = self.scene_details["delete"]
         deleted_ann = deleted_det["annotations"]
         margin = deleted_det["margin"]
+
+        assert deleted_ann is not None
 
         xyz = np.vstack([deleted_pcd["x"], deleted_pcd["y"], deleted_pcd["z"]])
         xyz = xyz.T
@@ -241,7 +256,7 @@ class EditedDetailsMixin:
         deleted_inds = scene_utils.cluster_overlapping_lists(deleted_inds)
         deleted_inds = [np.sort(list(ind)) for ind in deleted_inds]
 
-        self._deleted_indices = deleted_inds
+        self._deleted_indices.extend(deleted_inds)
         return self._deleted_indices
 
     @property
