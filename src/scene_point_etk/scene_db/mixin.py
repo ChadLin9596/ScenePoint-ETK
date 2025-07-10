@@ -2,6 +2,7 @@ import os
 import glob
 import pickle
 import numpy as np
+import matplotlib.pyplot as plt
 
 from .. import argoverse2
 from .. import patch_db
@@ -12,6 +13,25 @@ import py_utils.utils as utils
 import py_utils.pcd as pcd
 import py_utils.utils_img as utils_img
 import py_utils.visualization_pptk as visualization_pptk
+
+
+def segment_with_overlap_full(indices, n):
+    indices = np.asarray(indices)
+    step = n - n // 3
+    segments = []
+
+    start = 0
+    while start + n <= len(indices):
+        segments.append(indices[start : start + n])
+        start += step
+
+    # Handle last segment
+    if start < len(indices):
+        last_start = len(indices) - n
+        if len(indices) - start >= n // 3:
+            segments.append(indices[last_start : last_start + n])
+
+    return segments
 
 
 class ScenePCDMixin:
@@ -117,6 +137,16 @@ class CameraSequenceMixin:
     def cameras(self):
         return self.camera_sequence.list_cameras()
 
+    def get_an_image(self, camera_name, filename_or_index):
+
+        filename = self._initialize_cam_fnames(camera_name, filename_or_index)
+
+        camera_root = os.path.join(self.cameras_root, camera_name)
+        images_root = os.path.join(camera_root, "images")
+        filepath = os.path.join(images_root, f"{filename}.png")
+
+        return plt.imread(filepath)[..., :3]  # read as RGB
+
     def get_camera_filenames(self, camera_name):
         camera_sequence = self.camera_sequence.get_a_camera(camera_name)
         return list(map(str, camera_sequence.timestamps))
@@ -134,10 +164,10 @@ class CameraSequenceMixin:
         return filename
 
     @property
-    def point_indices_map(self):
+    def camera_point_indices_map(self):
 
-        if hasattr(self, "_point_indices_map"):
-            return self._point_indices_map.copy()
+        if hasattr(self, "_camera_point_indices_map"):
+            return self._camera_point_indices_map.copy()
 
         point_indices = {}
 
@@ -174,8 +204,108 @@ class CameraSequenceMixin:
             indices_maps = np.array(indices_maps)
             point_indices[camera] = indices_maps
 
-        self._point_indices_map = point_indices
-        return self._point_indices_map.copy()
+        self._camera_point_indices_map = point_indices
+        return self._camera_point_indices_map.copy()
+
+    @property
+    def camera_point_map(self):
+
+        if hasattr(self, "_camera_point_map"):
+            return self._camera_point_map.copy()
+
+        point_maps = {}
+
+        for camera in self.cameras:
+            indices_maps = self.camera_point_indices_map[camera]
+            xyz = self.pcd_xyz
+
+            shape = indices_maps.shape + (3,)
+            valid_map = indices_maps != -1
+            point_map = np.full(shape, np.nan, dtype=np.float32)
+            point_map[valid_map] = xyz[indices_maps[valid_map]]
+            point_maps[camera] = point_map
+
+        self._camera_point_map = point_maps
+        return self._camera_point_map.copy()
+
+    @property
+    def camera_depth_map(self):
+
+        if hasattr(self, "_camera_depth_map"):
+            return self._camera_depth_map.copy()
+
+        depth_maps = {}
+
+        for camera in self.cameras:
+
+            img_seq = self.camera_sequence.get_a_camera(camera)
+
+            extrinsics = img_seq.extrinsic  # (N, 4, 4)
+            point_map = self.camera_point_map[camera]
+
+            depth_map = []
+            for extrinsic, point in zip(extrinsics, point_map):
+
+                depth = np.full(point.shape[:2], np.nan, dtype=np.float32)
+                valid_map = ~np.isnan(point).any(axis=-1)
+
+                if not np.any(valid_map):
+                    depth_map.append(depth)
+                    continue
+
+                xyz = point[valid_map]
+                xyz = utils_img._trans_from_world_to_camera(xyz, extrinsic)
+                depth[valid_map] = xyz[:, 2]
+                depth_map.append(depth)
+
+            depth_map = np.array(depth_map)
+            depth_maps[camera] = depth_map
+
+        self._camera_depth_map = depth_maps
+        return self._camera_depth_map.copy()
+
+    def _chunkify(self, camera_name, chunk_size=50, with_overlap=True):
+
+        img_seq = self.camera_sequence.get_a_camera(camera_name)
+        segments = []
+
+        if with_overlap:
+            indices = np.arange(len(img_seq))
+            segments.extend(segment_with_overlap_full(indices, chunk_size))
+
+        else:
+            indices = np.arange(0, len(img_seq), chunk_size)
+            indices = np.r_[indices, len(img_seq)]
+
+            for start, end in zip(indices[:-1], indices[1:]):
+                segment = np.arange(start, end)
+                segments.append(segment)
+
+        return segments
+
+    def chunkify_images(self, camera_name, chunk_size=50, with_overlap=True):
+
+        segments = self._chunkify(camera_name, chunk_size, with_overlap)
+
+        for segment in segments:
+
+            segment_images = []
+            for idx in segment:
+                image = self.get_an_image(camera_name, idx)
+                segment_images.append(image)
+
+            yield np.array(segment_images)
+
+    def chunkify_point_map(
+        self, camera_name, chunk_size=50, with_overlap=True
+    ):
+
+        point_map = self.camera_point_map[camera_name]
+        segments = self._chunkify(camera_name, chunk_size, with_overlap)
+
+        for segment in segments:
+            segment_points = point_map[segment]
+            yield segment_points
 
 
 class EditedDetailsMixin:
@@ -326,3 +456,59 @@ class EditedDetailsMixin:
             vertice = np.sum(vertice[:, None, :] * R.T, axis=-1) + mean
             bounding_boxes.append(vertice)
         return bounding_boxes
+
+    def camera_change_map(
+        self,
+        neighborhood_size=7,
+        num_valid_points=3,
+        depth_threshold=0.1,
+    ):
+
+        if hasattr(self, "_camera_change_map"):
+            return self._camera_change_map.copy()
+
+        camera_change_map = {}
+
+        for camera in self.cameras:
+
+            img_seq = self.camera_sequence.get_a_camera(camera)
+            lidar_sweeps = self.raw_lidar_sweeps
+
+            assert len(img_seq) == len(lidar_sweeps), (
+                f"Camera {camera} and lidar sweeps have different lengths: "
+                f"{len(img_seq)} vs {len(lidar_sweeps)}"
+            )
+
+            cd_masks = []
+            for index in range(len(img_seq)):
+
+                scene_index_map = self.camera_point_indices_map[camera][index]
+                scene_depth_map = self.camera_depth_map[camera][index]
+                lidar_depth_map = img_seq.get_a_depth_map(
+                    index,
+                    lidar_sweeps[index].xyz,
+                    invalid_value=np.nan,
+                )
+
+                cd_mask = np.zeros_like(scene_index_map, dtype=bool)
+                for indices in self.deleted_indices:
+
+                    mask = np.isin(scene_index_map, indices)
+                    if not np.any(mask):
+                        continue
+
+                    mask = scene_utils.filter_visible(
+                        scene_depth_map,
+                        lidar_depth_map,
+                        FOV_mask=mask,
+                        neighborhood_size=neighborhood_size,
+                        depth_threshold=depth_threshold,
+                        num_valid_points=num_valid_points,
+                    )
+                    mask = utils_img.fill_sparse_boolean_by_convex_hull(mask)
+                    cd_mask |= mask
+                cd_masks.append(cd_mask)
+            camera_change_map[camera] = np.array(cd_masks)
+
+        self._camera_change_map = camera_change_map
+        return self._camera_change_map.copy()
