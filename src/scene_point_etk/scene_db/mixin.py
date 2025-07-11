@@ -173,7 +173,7 @@ class CameraSequenceMixin:
 
         for camera in self.cameras:
 
-            root = os.path.split(self.camera_seq_filepath)[0]
+            root = self.cameras_root
             root = os.path.join(root, camera)
             point_indices_root = os.path.join(root, "sparse_point_indices")
             os.makedirs(point_indices_root, exist_ok=True)
@@ -506,6 +506,7 @@ class EditedDetailsMixin:
                         num_valid_points=num_valid_points,
                     )
                     mask = utils_img.fill_sparse_boolean_by_convex_hull(mask)
+                    mask = mask > 0
                     cd_mask |= mask
                 cd_masks.append(cd_mask)
             camera_change_map[camera] = np.array(cd_masks)

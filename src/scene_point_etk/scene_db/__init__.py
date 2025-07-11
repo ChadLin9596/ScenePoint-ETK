@@ -38,6 +38,7 @@ def set_scene_root(scene_root=None, overwrite=True):
             json.dump(config, f, indent=4)
 
     # build the PATCH_MAP
+    SCENE_MAP.clear()
     paths = sorted(glob.glob(os.path.join(SCENE_ROOT, "*")))
     for path in paths:
 
