@@ -1,3 +1,4 @@
+import glob
 import os
 
 import scene_point_etk.scene_db as scene_db
@@ -32,12 +33,32 @@ def main():
         size_origin_pcd += getsize(origin_scene.scene_filepath)
         size_camera_details += getsize(origin_scene.camera_seq_filepath)
 
+        for camera in origin_scene.cameras:
+            path = os.path.join(
+                origin_scene.cameras_root,
+                camera,
+                "sparse_point_indices",
+                "*.npy",
+            )
+            for f in glob.glob(path):
+                size_camera_map += getsize(f)
+
         versions = scene_db.list_versions_by_scene_id(log_id)
         for version in versions:
             num_edited_scene += 1
             edited_scene = scene_db.EditedScene(log_id, version)
             size_edited_details += getsize(edited_scene.details_filepath)
             size_edited_pcd += getsize(edited_scene.scene_filepath)
+
+            for camera in edited_scene.cameras:
+                path = os.path.join(
+                    edited_scene.cameras_root,
+                    camera,
+                    "sparse_point_indices",
+                    "*.npy",
+                )
+                for f in glob.glob(path):
+                    size_camera_map += getsize(f)
 
         prog.toc()
 

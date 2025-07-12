@@ -178,14 +178,6 @@ class CameraSequenceMixin:
             point_indices_root = os.path.join(root, "sparse_point_indices")
             os.makedirs(point_indices_root, exist_ok=True)
 
-            fs = os.path.join(root, "sparse_point_indices", "*.npy")
-            fs = sorted(glob.glob(fs), key=lambda x: os.path.basename(x))
-
-            if len(fs) > 0:
-                indices_maps = np.array([np.load(f) for f in fs])
-                point_indices[camera] = indices_maps
-                continue
-
             img_seq = self.camera_sequence.get_a_camera(camera)
             intrinsic = img_seq.intrinsic
             extrinsics = img_seq.extrinsic
@@ -194,13 +186,20 @@ class CameraSequenceMixin:
 
             indices_maps = []
             for idx, extrinsic in enumerate(extrinsics):
+
+                name = self._initialize_cam_fnames(camera, idx) + ".npy"
+                path = os.path.join(point_indices_root, name)
+                if os.path.exists(path):
+                    index_map = np.load(path)
+                    indices_maps.append(index_map)
+                    continue
+
                 args = (xyz, intrinsic, extrinsic, H, W)
                 kwargs = {"min_distance": 0.0, "max_distance": np.inf}
                 index_map = utils_img.points_to_index_map(*args, **kwargs)
                 indices_maps.append(index_map)
+                np.save(path, index_map)
 
-                name = self._initialize_cam_fnames(camera, idx) + ".npy"
-                np.save(os.path.join(point_indices_root, name), index_map)
             indices_maps = np.array(indices_maps)
             point_indices[camera] = indices_maps
 
