@@ -145,6 +145,12 @@ class CameraSequenceMixin:
         images_root = os.path.join(camera_root, "images")
         filepath = os.path.join(images_root, f"{filename}.png")
 
+        if not os.path.exists(filepath):
+            filenames = self.get_camera_filenames(camera_name)
+            i = np.searchsorted(filenames, filename, side="left")
+            img_seq = self.camera_sequence.get_a_camera(camera_name)
+            return img_seq.get_an_image(i)
+
         return plt.imread(filepath)[..., :3]  # read as RGB
 
     def get_camera_filenames(self, camera_name):
