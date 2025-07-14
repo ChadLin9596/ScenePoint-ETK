@@ -443,6 +443,70 @@ class EditedScene(Basic, EditedDetailsMixin):
 
         return self._changed_lidar_sweeps
 
+    def camera_change_map(
+        self,
+        neighborhood_size=7,
+        num_valid_points=3,
+        depth_threshold=0.1,
+    ):
+
+        if hasattr(self, "_camera_change_map"):
+            return self._camera_change_map.copy()
+
+        origin_scene = OriginalScene(self.root)
+        camera_point_indices_map = origin_scene.camera_point_indices_map
+        camera_depth_map = origin_scene.camera_depth_map
+
+        camera_change_map = {}
+
+        for camera in self.cameras:
+
+            img_seq = self.camera_sequence.get_a_camera(camera)
+            lidar_sweeps = self.raw_lidar_sweeps
+            lidar_sweeps = argoverse2.SweepSequence.from_sweeps(lidar_sweeps)
+            lidar_sweeps = lidar_sweeps.align_timestamps(img_seq.timestamps)
+            lidar_sweeps = lidar_sweeps.sweeps
+
+            assert len(img_seq) == len(lidar_sweeps), (
+                f"Camera {camera} and lidar sweeps have different lengths: "
+                f"{len(img_seq)} vs {len(lidar_sweeps)}"
+            )
+
+            cd_masks = []
+            for index in range(len(img_seq)):
+
+                scene_index_map = camera_point_indices_map[camera][index]
+                scene_depth_map = camera_depth_map[camera][index]
+                lidar_depth_map = img_seq.get_a_depth_map(
+                    index,
+                    lidar_sweeps[index].xyz,
+                    invalid_value=np.nan,
+                )
+
+                cd_mask = np.zeros_like(scene_index_map, dtype=bool)
+                for indices in self.deleted_indices:
+
+                    mask = np.isin(scene_index_map, indices)
+                    if not np.any(mask):
+                        continue
+
+                    mask = scene_utils.filter_visible(
+                        scene_depth_map,
+                        lidar_depth_map,
+                        FOV_mask=mask,
+                        neighborhood_size=neighborhood_size,
+                        depth_threshold=depth_threshold,
+                        num_valid_points=num_valid_points,
+                    )
+                    mask = utils_img.fill_sparse_boolean_by_convex_hull(mask)
+                    mask = mask > 0
+                    cd_mask |= mask
+                cd_masks.append(cd_mask)
+            camera_change_map[camera] = np.array(cd_masks)
+
+        self._camera_change_map = camera_change_map
+        return self._camera_change_map.copy()
+
     # def process_source_masks(self, camera_name):
 
     #     camera_root = os.path.join(self.cameras_root, camera_name)

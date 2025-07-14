@@ -203,7 +203,7 @@ class Sweep(ArgoMixin, array_data.Array):
         return camera_sequence.colour_single_sweep(timestamp, self.xyz)
 
 
-class SweepSequence(ArgoMixin, array_data.Array):
+class SweepSequence(ArgoMixin, array_data.Timestamps):
 
     def __init__(self, log_id, coordinate="map"):
 
@@ -217,6 +217,7 @@ class SweepSequence(ArgoMixin, array_data.Array):
         self._path = path
         self.sweeps = [Sweep(i, coordinate) for i in sweep_files]
         self.coordinate = coordinate
+        self.timestamps = [s.sweep_timestamp for s in self.sweeps]
 
     def __repr__(self):
 
@@ -266,8 +267,18 @@ class SweepSequence(ArgoMixin, array_data.Array):
         coordinate = sweeps[0]._coordinate
 
         seq = SweepSequence(log_id=log_id, coordinate=coordinate)
+        seq._allocate(len(sweeps))
         seq.sweeps = sweeps
+        seq.timestamps = [s.sweep_timestamp for s in sweeps]
         return seq
+
+    def align_timestamps(self, timestamps):
+
+        other = super().align_timestamps(timestamps)
+        other._path = self._path
+        other.sweeps = [self.sweeps[i] for i in other.index]
+        other.coordinate = self.coordinate
+        return other
 
     def filtered_by_annotations(
         self,
@@ -341,7 +352,8 @@ class SweepSequence(ArgoMixin, array_data.Array):
 
     @property
     def sweep_timestamp(self):
-        return [s.sweep_timestamp for s in self.sweeps]
+        return self.timestamps
+        # return [s.sweep_timestamp for s in self.sweeps]
 
     def export_to_voxel_grid(
         self,

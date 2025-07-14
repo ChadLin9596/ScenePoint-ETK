@@ -12,6 +12,7 @@ def main():
 
     num_origin_scene = 0
     num_edited_scene = 0
+    num_camera_map = 0
 
     size_origin_details = 0
     size_origin_pcd = 0
@@ -41,6 +42,7 @@ def main():
                 "*.npy",
             )
             for f in glob.glob(path):
+                num_camera_map += 1
                 size_camera_map += getsize(f)
 
         versions = scene_db.list_versions_by_scene_id(log_id)
@@ -58,12 +60,14 @@ def main():
                     "*.npy",
                 )
                 for f in glob.glob(path):
+                    num_camera_map += 1
                     size_camera_map += getsize(f)
 
         prog.toc()
 
     print("num_origin_scene\t", num_origin_scene)
     print("num_edited_scene\t", num_edited_scene)
+    print("num_camera_map  \t", num_camera_map)
     print("size_origin_details\t", round(size_origin_details / 2**30, 2), "GB")
     print("size_origin_pcd    \t", round(size_origin_pcd / 2**30, 2), "GB")
     print("size_edited_details\t", round(size_edited_details / 2**30, 2), "GB")
