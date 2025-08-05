@@ -1,30 +1,73 @@
 """
-FORMAT:
+This Module supports the Point Cloud Data(PCD) deletion and addition
+using two specific format: `delete_info` and `add_info`.
 
-delete_info:{
-    "annotations": <Annotation object> or None,
-    "margin": <float>,
-    "indices": <list of int>
-}
+PCD:
+    a numpy structured array with fields defined in CLOUD_COMPARE_DTYPE,
 
-add_info:{
-    "patches": <list of patch keys> (n),
-    "anchor_xyzs": (n, 3) array,
-    "anchor_eulers": (n, 3) array,
-    "merge_indices": <list of int array> (n),
-    "z_offset": <float> (optional, default 0.0)
-    "voxel_size": <float> (optional, default 0.2)
-}
+delete_info:
+    intermediate results of PCD deletion
+
+    dict:
+        annotations: <Annotation object> (optional, default None)
+        margin: <float> (optional, default 0.0)
+        indices: <list of int> (optional, default list())
+
+    usage:
+        `annotations` & `margin` get deleted points using
+        >>> annotations.is_points_in_bounding_boxes(xyz, margin=margin)
+
+        `indices` get deleted points using pre-defined indices
+        >>> scene_pcd[indices]
+
+    note:
+        | annotations | indices |
+        |-------------|---------|
+        | X           | X       | [] with PCD dtype
+        | X           | V       | delete points by indices only
+        | V           | X       | delete points by annotations only
+        | V           | V.      | unique/union results by both methods
+
+add_info:
+    intermediate results of PCD addition,
+
+    dict:
+        patches: <list of patch keys> (n),
+        anchor_xyzs: (n, 3) array,
+        anchor_eulers: (n, 3) array,
+        merge_indices: <list of int array> (n),
+        z_offset: <float> (optional, default 0.0)
+        voxel_size: <float> (optional, default 0.2)
+
+    Note:
+        merge_indices record the final indices of each patch PCD, which
+        filter out
+        1. dublicated voxels after transformation
+        2. overlapping points with the existing scene_pcd
+
+        if this info will be used to the same scene_pcd, it should be
+        pre-computed and recorded to save runtime
+
+        if this info will be used to different scene_pcd, it should not
+        be recorded, and it will be computed on-the-fly.
+
+change_info:
+    a dict that contains both `delete_info` and `add_info`, which is used
+    to apply changes to the target PCD.
+
+    dict:
+        delete: <delete_info>
+        add: <add_info>
+        voxel_size: <float> (optional, default 0.2)
 """
 
-import networkx as nx
 import numpy as np
 
 from .. import patch_db
 from ..argoverse2 import CLOUD_COMPARE_DTYPE
+from ..utils import infer_merge_indices
 import py_utils.utils as utils
 import py_utils.voxel_grid as voxel_grid
-import py_utils.visualization_pptk as visualization_pptk
 
 
 def get_deleted_pcd(scene_pcd, delete_info, return_mask=False):
@@ -41,8 +84,10 @@ def get_deleted_pcd(scene_pcd, delete_info, return_mask=False):
 
     # delete by annotations:
     annot = delete_info.get("annotations", None)
+    margin = delete_info.get("margin", 0.0)
+
     if annot is not None:
-        margin = delete_info.get("margin", 0.0)
+        assert hasattr(annot, "is_points_in_bounding_boxes")
         xyz = np.vstack([scene_pcd["x"], scene_pcd["y"], scene_pcd["z"]]).T
         indices = annot.is_points_in_bounding_boxes(xyz, margin=margin)
         mask[indices] = True
@@ -57,61 +102,6 @@ def get_deleted_pcd(scene_pcd, delete_info, return_mask=False):
     return scene_pcd[mask]
 
 
-def infer_merge_indices(scene_pcd, add_info):
-    """
-    Infer merge indices for the added patches based on the existing scene_pcd.
-    This is used to avoid adding points that are already in the scene_pcd.
-    """
-    patches = add_info["patches"]
-    anchor_xyzs = add_info["anchor_xyzs"]
-    anchor_euls = add_info["anchor_eulers"]
-    z_offset = add_info.get("z_offset", 0.0)
-    voxel_size = add_info.get("voxel_size", 0.2)
-
-    assert len(patches) == len(anchor_xyzs) == len(anchor_euls)
-
-    anchor_Rs = utils.euler_to_R(anchor_euls)
-
-    merge_indices = []
-    for key, anchor_xyz, anchor_R in zip(patches, anchor_xyzs, anchor_Rs):
-
-        patch = patch_db.get_patch_from_key(key).copy()
-        patch_xyz = np.vstack([patch["x"], patch["y"], patch["z"]]).T
-
-        # align the lowest point of the patch to the anchor_xyz
-        i = np.argmin(patch_xyz[:, 2])
-        pos_diff = anchor_xyz - patch_xyz[i]
-        patch_xyz_world = patch_xyz @ anchor_R + pos_diff
-
-        # updated the patch coordinates to world coordinates
-        x, y, z = patch_xyz_world.T
-        patch["x"] = x
-        patch["y"] = y
-        patch["z"] = z + z_offset
-
-        # update the patch's center
-        patch["center"] = patch_xyz_world // voxel_size + 0.5 * voxel_size
-
-        _, indices = voxel_grid.unique_pcd(
-            patch,
-            voxel_size=voxel_size,
-            return_indices=True,
-        )
-
-        # get the patch points that are not overlapping with the scene_pcd
-        # no need to unique the scene_pcd, as it is already unique
-        _, mask = voxel_grid.subtract_pcds(
-            patch[indices],
-            scene_pcd,
-            voxel_size=voxel_size,
-            return_mask=True,
-        )
-
-        merge_indices.append(indices[mask])
-
-    return merge_indices
-
-
 def get_added_pcd(scene_pcd, add_info, return_splits=False):
 
     if len(add_info) == 0 or len(add_info["patches"]) == 0:
@@ -119,11 +109,15 @@ def get_added_pcd(scene_pcd, add_info, return_splits=False):
             return np.empty(0, dtype=np.dtype(CLOUD_COMPARE_DTYPE)), []
         return np.empty(0, dtype=np.dtype(CLOUD_COMPARE_DTYPE))
 
+    if "merge_indices" not in add_info:
+        merge_indices = infer_merge_indices(scene_pcd, add_info)
+    else:
+        merge_indices = add_info["merge_indices"]
+
     # extract information from add_info
     patches = add_info["patches"]
     anchor_xyzs = add_info["anchor_xyzs"]
     anchor_euls = add_info["anchor_eulers"]
-    merge_indices = add_info["merge_indices"]
     z_offset = add_info.get("z_offset", 0.0)
     voxel_size = add_info.get("voxel_size", 0.2)
 
@@ -181,14 +175,10 @@ def apply_change_info_to_target_pcd(
     target_pcd = target_pcd[~mask]
 
     # added points from add_info
-    additional_pcd, split = get_added_pcd(
-        target_pcd,
-        add_info,
-        return_splits=True,
-    )
-    updated_pcd = np.concatenate([target_pcd, additional_pcd])
+    add_pcd, split = get_added_pcd(target_pcd, add_info, return_splits=True)
+    updated_pcd = np.concatenate([target_pcd, add_pcd])
 
-    s = np.r_[0, split, len(additional_pcd)]
+    s = np.r_[0, split, len(add_pcd)]
     d = np.diff(s).astype(np.int64)
     segment_info = np.repeat(np.arange(len(s) - 1), d)
     segment_info = np.r_[np.ones(len(target_pcd)) * -1, segment_info]
@@ -211,7 +201,7 @@ def apply_change_info_to_target_pcd(
 
     details = {
         "deleted_points": del_pcd,
-        "added_points": additional_pcd,
+        "added_points": add_pcd,
         "added_splits": split,
         "deleted_indices_of_target": np.where(mask)[0],
         "added_segment_indices_of_source": segment_infos,

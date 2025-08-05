@@ -13,25 +13,7 @@ import py_utils.utils as utils
 import py_utils.pcd as pcd
 import py_utils.utils_img as utils_img
 import py_utils.visualization_pptk as visualization_pptk
-
-
-def segment_with_overlap_full(indices, n):
-    indices = np.asarray(indices)
-    step = n - n // 3
-    segments = []
-
-    start = 0
-    while start + n <= len(indices):
-        segments.append(indices[start : start + n])
-        start += step
-
-    # Handle last segment
-    if start < len(indices):
-        last_start = len(indices) - n
-        if len(indices) - start >= n // 3:
-            segments.append(indices[last_start : last_start + n])
-
-    return segments
+import py_utils.utils_segmentation as utils_segmentation
 
 
 class ScenePCDMixin:
@@ -275,8 +257,16 @@ class CameraSequenceMixin:
         segments = []
 
         if with_overlap:
-            indices = np.arange(len(img_seq))
-            segments.extend(segment_with_overlap_full(indices, chunk_size))
+
+            f = utils_segmentation.compute_sliding_window_indices_with_overlap
+            s_inds, e_inds = f(len(img_seq), chunk_size, overlap_ratio=0.3)
+
+            for s, e in zip(s_inds, e_inds):
+                segment = np.arange(s, e)
+                segments.append(segment)
+
+            # indices = np.arange(len(img_seq))
+            # segments.extend(segment_with_overlap_full(indices, chunk_size))
 
         else:
             indices = np.arange(0, len(img_seq), chunk_size)
@@ -460,6 +450,5 @@ class EditedDetailsMixin:
             vertice = vertice + off
             vertice = np.sum(vertice[:, None, :] * R.T, axis=-1) + mean
             bounding_boxes.append(vertice)
+
         return bounding_boxes
-
-
