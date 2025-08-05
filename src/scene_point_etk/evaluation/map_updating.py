@@ -1,8 +1,6 @@
 import numpy as np
 import scipy.spatial
 
-import py_utils.voxel_grid as voxel_grid
-
 
 def nearest_distance(point_cloud_1, point_cloud_2):
 
