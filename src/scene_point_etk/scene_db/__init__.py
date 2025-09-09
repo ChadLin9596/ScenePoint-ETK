@@ -82,6 +82,28 @@ def get_scene_path_by_id(scene_id):
     return SCENE_MAP[scene_id]["path"]
 
 
+def list_scene_version_pairs(scene_ids=[], versions=[]):
+
+    if len(scene_ids) == 0:
+        scene_ids = list_scene_ids()
+
+    raveled = []
+    for scene_id in scene_ids:
+        available_versions = list_versions_by_scene_id(scene_id)
+
+        if len(versions) == 0:
+            selected_versions = available_versions
+        else:
+            selected_versions = [
+                v for v in versions if v in available_versions
+            ]
+
+        for version in selected_versions:
+            raveled.append((scene_id, version))
+
+    return raveled
+
+
 class OriginalScene(scene.OriginalScene):
 
     def __init__(self, scene_id):
