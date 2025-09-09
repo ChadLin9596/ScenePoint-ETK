@@ -82,19 +82,13 @@ def get_scene_path_by_id(scene_id):
     return SCENE_MAP[scene_id]["path"]
 
 
-# class Scene(scene.Scene):
-
-#     def __init__(self, scene_id, version):
-#         super().__init__(os.path.join(SCENE_ROOT, scene_id), version)
-
-
 class OriginalScene(scene.OriginalScene):
 
     def __init__(self, scene_id):
-        super().__init__(os.path.join(SCENE_ROOT, scene_id))
+        super().__init__(get_scene_path_by_id(scene_id))
 
 
 class EditedScene(scene.EditedScene):
 
     def __init__(self, scene_id, version):
-        super().__init__(os.path.join(SCENE_ROOT, scene_id), version)
+        super().__init__(get_scene_path_by_id(scene_id), version)
