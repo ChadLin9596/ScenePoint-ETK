@@ -17,6 +17,15 @@ import py_utils.utils_segmentation as utils_segmentation
 
 
 class ScenePCDMixin:
+    """
+    a mixin class for scene PCD data.
+    ├── <Scene ID 00>
+    │   └── <version name>
+    │       └── scene.pcd  <- scene_filepath
+    │
+    ├── <Scene ID 01>
+    └── ...
+    """
 
     scene_filepath = ""
 
@@ -69,6 +78,15 @@ class ScenePCDMixin:
 
 
 class SceneDetailsMixin:
+    """
+    a mixin class for scene details data.
+    ├── <Scene ID 00>
+    │   └── <version name>
+    │       └── details.pkl  <- details_filepath
+    │
+    ├── <Scene ID 01>
+    └── ...
+    """
 
     details_filepath = ""
 
@@ -87,7 +105,28 @@ class SceneDetailsMixin:
 
 
 class CameraSequenceMixin:
+    """
+    a mixin class for camera sequence data.
+    ├── <Scene ID 00>
+    │   │
+    │   └── <version name>
+    │       └── cameras  <- cameras_root
+    │           ├── cam_sequence.pkl (optional)  <- camera_seq_filepath
+    │           ├── <camera name 1>
+    │           │   └── sparse_point_indices
+    │           │       ├── <point indices 1>.npy
+    │           │       └── ...
+    │           │
+    │           ├── <camera name 2>
+    │           └── ...
+    │
+    ├── <Scene ID 01>
+    └── ...
+    """
 
+    # separate `cameras_root` and `camera_seq_filepath` to allow
+    # users to manage camera sequence files manually if needed
+    cameras_root = ""
     camera_seq_filepath = ""
 
     @property
@@ -119,25 +158,10 @@ class CameraSequenceMixin:
     def cameras(self):
         return self.camera_sequence.list_cameras()
 
-    def get_an_image(self, camera_name, filename_or_index):
-
-        filename = self._initialize_cam_fnames(camera_name, filename_or_index)
-
-        camera_root = os.path.join(self.cameras_root, camera_name)
-        images_root = os.path.join(camera_root, "images")
-        filepath = os.path.join(images_root, f"{filename}.png")
-
-        if not os.path.exists(filepath):
-            filenames = self.get_camera_filenames(camera_name)
-            i = np.searchsorted(filenames, filename, side="left")
-            img_seq = self.camera_sequence.get_a_camera(camera_name)
-            return img_seq.get_an_image(i)
-
-        return plt.imread(filepath)[..., :3]  # read as RGB
-
     def get_camera_filenames(self, camera_name):
-        camera_sequence = self.camera_sequence.get_a_camera(camera_name)
-        return list(map(str, camera_sequence.timestamps))
+        files = self.camera_sequence.get_a_camera(camera_name)._files
+        files = [os.path.basename(i) for i in files]
+        return files
 
     def _initialize_cam_fnames(self, camera_name, filename_or_index):
 
@@ -151,6 +175,82 @@ class CameraSequenceMixin:
         filename = filename.replace(".jpg", "")
         return filename
 
+    def get_an_image(self, camera_name, index):
+
+        img_seq = self.camera_sequence.get_a_camera(camera_name)
+        return img_seq.get_an_image(index)
+
+    def _point_indices_on_an_image(
+        self,
+        camera_name,
+        index,
+        xyz,
+        min_distance=0.0,
+        max_distance=np.inf,
+    ):
+
+        img_seq = self.camera_sequence.get_a_camera(camera_name)
+        intrinsic = img_seq.intrinsic
+        extrinsic = img_seq.extrinsic[index]
+        H, W = img_seq.figsize
+
+        args = (xyz, intrinsic, extrinsic, H, W)
+        kwargs = {"min_distance": min_distance, "max_distance": max_distance}
+        index_map = utils_img.points_to_index_map(*args, **kwargs)
+        return index_map
+
+    def point_indices_on_an_image(
+        self,
+        camera_name,
+        index,
+        xyz,
+        min_distance=0.0,
+        max_distance=np.inf,
+        overwrite=False,
+    ):
+
+        root = self.cameras_root
+        root = os.path.join(root, camera_name, "sparse_point_indices")
+        os.makedirs(root, exist_ok=True)
+
+        filename = self.get_camera_filenames(camera_name)[index]
+        filename = filename.replace(".npy", "")
+        filename = filename.replace(".png", "")
+        filename = filename.replace(".jpg", "")
+        filename = os.path.join(root, filename + ".npy")
+
+        if os.path.exists(filename) and not overwrite:
+            index_map = np.load(filename)
+            return index_map
+
+        args = (camera_name, index, xyz)
+        kwargs = {"min_distance": min_distance, "max_distance": max_distance}
+        index_map = self._point_indices_on_an_image(*args, **kwargs)
+
+        if overwrite:
+            np.save(filename, index_map)
+
+        return index_map
+
+    def point_on_an_image(
+        self,
+        camera_name,
+        index,
+        xyz,
+        min_distance=0.0,
+        max_distance=np.inf,
+    ):
+
+        img_seq = self.camera_sequence.get_a_camera(camera_name)
+        intrinsic = img_seq.intrinsic
+        extrinsic = img_seq.extrinsic[index]
+        H, W = img_seq.figsize
+
+        args = (xyz, intrinsic, extrinsic, H, W)
+        kwargs = {"min_distance": 0.0, "max_distance": np.inf}
+        point_map = utils_img.points_to_point_map(*args, **kwargs)
+        return point_map
+
     @property
     def camera_point_indices_map(self):
 
@@ -162,7 +262,9 @@ class CameraSequenceMixin:
         for camera in self.cameras:
 
             root = self.cameras_root
-            root = os.path.join(root, camera)
+            root = os.path.join(
+                self.cameras_root, camera, "sparse_point_indices"
+            )
             point_indices_root = os.path.join(root, "sparse_point_indices")
             os.makedirs(point_indices_root, exist_ok=True)
 
@@ -177,10 +279,10 @@ class CameraSequenceMixin:
 
                 name = self._initialize_cam_fnames(camera, idx) + ".npy"
                 path = os.path.join(point_indices_root, name)
-                if os.path.exists(path):
-                    index_map = np.load(path)
-                    indices_maps.append(index_map)
-                    continue
+                # if os.path.exists(path):
+                #     index_map = np.load(path)
+                #     indices_maps.append(index_map)
+                #     continue
 
                 args = (xyz, intrinsic, extrinsic, H, W)
                 kwargs = {"min_distance": 0.0, "max_distance": np.inf}

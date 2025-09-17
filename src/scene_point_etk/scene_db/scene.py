@@ -18,7 +18,7 @@ import py_utils.utils_img as utils_img
 import py_utils.visualization_pptk as vis_pptk
 
 
-class Basic(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
+class Base(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
     """
     ├── <Scene ID 00>
     │   │
@@ -26,7 +26,7 @@ class Basic(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
     │       ├── details.pkl
     │       ├── scene.pcd
     │       └── cameras
-    │           ├── cam_sequence.pkl
+    │           ├── cam_sequence.pkl (optional)
     │           ├── <camera name 1>
     │           │   └── sparse_point_indices
     │           │       ├── <point indices 1>.npy
@@ -43,14 +43,16 @@ class Basic(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
 
         self.root = scene_root
         self.version = version
-        self.scene_root = os.path.join(scene_root, version)
-        self.cameras_root = os.path.join(self.scene_root, "cameras")
-        os.makedirs(self.cameras_root, exist_ok=True)
 
         join = os.path.join
+        self.scene_root = join(scene_root, version)
+
+        # setup for mixins: ScenePCD, SceneDetails, CameraSequence
         self.scene_filepath = join(self.scene_root, "scene.pcd")
         self.details_filepath = join(self.scene_root, "details.pkl")
+        self.cameras_root = join(self.scene_root, "cameras")
         self.camera_seq_filepath = join(self.cameras_root, "cam_sequence.pkl")
+        os.makedirs(self.cameras_root, exist_ok=True)
 
     # def process_camera(self, camera_name):
 
@@ -186,7 +188,7 @@ class Basic(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
             shutil.copy(self.camera_seq_filepath, path)
 
 
-class OriginalScene(Basic):
+class OriginalScene(Base):
     """
     based on Scene structure, but with fixed scene name "GT" and added
     the following structure:
@@ -279,7 +281,7 @@ class OriginalScene(Basic):
         return self._raw_lidar_sweeps
 
 
-class EditedScene(Basic, EditedDetailsMixin):
+class EditedScene(Base, EditedDetailsMixin):
     """
     based on Scene structure, but assume the GT scene is already processed
     and has the following structure:
