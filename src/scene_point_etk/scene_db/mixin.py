@@ -247,9 +247,38 @@ class CameraSequenceMixin:
         H, W = img_seq.figsize
 
         args = (xyz, intrinsic, extrinsic, H, W)
-        kwargs = {"min_distance": 0.0, "max_distance": np.inf}
+        kwargs = {
+            "min_distance": min_distance,
+            "max_distance": max_distance,
+            "invalid_value": np.nan,
+        }
         point_map = utils_img.points_to_point_map(*args, **kwargs)
         return point_map
+
+    def depth_on_an_image(
+        self,
+        camera_name,
+        index,
+        xyz,
+        min_distance=0.0,
+        max_distance=np.inf,
+    ):
+
+        img_seq = self.camera_sequence.get_a_camera(camera_name)
+        extrinsic = img_seq.extrinsic[index]
+
+        kwargs = {"min_distance": min_distance, "max_distance": max_distance}
+        point_map = self.point_on_an_image(camera_name, index, xyz, **kwargs)
+
+        depth = np.full(point_map.shape[:2], np.nan, dtype=np.float32)
+        valid_map = ~np.isnan(point_map).any(axis=-1)
+
+        xyz = point_map[valid_map]
+        xyz = utils_img._trans_from_world_to_camera(xyz, extrinsic)
+        depth[valid_map] = xyz[:, 2]
+
+        return depth
+
 
     @property
     def camera_point_indices_map(self):
