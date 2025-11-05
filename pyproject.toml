@@ -1,0 +1,26 @@
+[build-system]
+requires = [
+  "setuptools>=61",
+  "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scene_point_etk"
+version = "0.1.0"
+description = ""
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+  {name = "Chad Lin"},
+  {email = "chun-jung.lin@adelaide.edu.au"}
+]
+urls = { "Homepage" = "https://github.com/ChadLin9596/ScenePoint-ETK" }
+requires-python = ">=3.7"
+dependencies = [
+    "pyarrow",
+    "scikit-learn",
+]
+
+[tool.setuptools.package-data]
+scene_point_etk = ["config.json", "argoverse2/*.json"]
