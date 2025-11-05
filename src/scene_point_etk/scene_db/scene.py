@@ -54,6 +54,35 @@ class Base(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
         self.camera_seq_filepath = join(self.cameras_root, "cam_sequence.pkl")
         os.makedirs(self.cameras_root, exist_ok=True)
 
+    @property
+    def bytesize(self):
+        R = {
+            "scene.pcd": 0,
+            "details.pkl": 0,
+            "cam_sequence.pkl": 0,
+            "cameras": {}
+        }
+        if os.path.exists(self.scene_filepath):
+            R["scene.pcd"] = os.path.getsize(self.scene_filepath)
+        if os.path.exists(self.details_filepath):
+            R["details.pkl"] = os.path.getsize(self.details_filepath)
+        if os.path.exists(self.camera_seq_filepath):
+            R["cam_sequence.pkl"] = os.path.getsize(self.camera_seq_filepath)
+
+        for camera in self.cameras:
+            camera_path = os.path.join(self.cameras_root, camera)
+            total_size = 0
+            for dirpath, dirnames, filenames in os.walk(camera_path):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    if os.path.islink(fp):
+                        continue
+
+                    total_size += os.path.getsize(fp)
+            R["cameras"][camera] = total_size
+
+        return R
+
     def export(self, output_dir, skip_scene=False, skip_cameras=False):
 
         version = os.path.basename(self.scene_root)
@@ -98,9 +127,16 @@ class OriginalScene(Base):
 
     @property
     def scene_pcd(self):
+        # override ScenePCDMixin.scene_pcd to generate scene.pcd from
+        # scene_details if scene.pcd not exists
+
         if hasattr(self, "_scene_pcd"):
             return self._scene_pcd.copy()
 
+        # generate scene.pcd if not exists
+        # the generated scene.pcd will be cached for future use
+        # the generated scene.pcd should be identical if the details.pkl
+        # is not changed
         if not os.path.exists(self.scene_filepath):
             details = self.scene_details
             voxel_size = details.get("voxel_size", 0.2)
@@ -123,6 +159,10 @@ class OriginalScene(Base):
 
     @property
     def raw_lidar_sweeps(self):
+        """
+        a list of argoverse2.Sweep containing both static/dynamic points
+        """
+
         if hasattr(self, "_raw_lidar_sweeps"):
             return self._raw_lidar_sweeps
 
@@ -131,6 +171,14 @@ class OriginalScene(Base):
         self._raw_lidar_sweeps = ss
 
         return self._raw_lidar_sweeps
+
+    @property
+    def cleaned_lidar_sweeps(self):
+        """
+        a list of argoverse2.Sweep containing only static points
+        """
+        return self.scene_details["sweeps"]
+
 
 
 class EditedScene(Base, EditedDetailsMixin):
@@ -185,6 +233,7 @@ class EditedScene(Base, EditedDetailsMixin):
             msg = f"GT scene not found at {os.path.join(scene_root, 'GT')}"
             raise RuntimeError(msg)
 
+        # reuse the camera sequence from the GT scene
         p = os.path.join(self.root, "GT", "cameras", "cam_sequence.pkl")
         self.camera_seq_filepath = os.path.join(p)
 
@@ -202,6 +251,11 @@ class EditedScene(Base, EditedDetailsMixin):
 
     @property
     def scene_pcd(self):
+        # override ScenePCDMixin.scene_pcd to generate scene.pcd from
+        # scene_details if scene.pcd not exists
+        # note that the way to generate scene.pcd is different from
+        # OriginalScene
+
         if hasattr(self, "_scene_pcd"):
             return self._scene_pcd.copy()
 
@@ -227,43 +281,36 @@ class EditedScene(Base, EditedDetailsMixin):
         self._scene_pcd = pcd_data.copy()
 
     @property
-    def raw_lidar_sweeps(self):
-        if hasattr(self, "_raw_lidar_sweeps"):
-            return self._raw_lidar_sweeps
+    def deleted_lidar_sweeps(self):
 
-        ss = OriginalScene(self.root).scene_details["sweeps"]
-        ss = [argoverse2.Sweep(s.filepath, coordinate="map") for s in ss]
-        self._raw_lidar_sweeps = ss
+        if hasattr(self, "_deleted_lidar_sweeps"):
+            return self._deleted_lidar_sweeps
 
-        return self._raw_lidar_sweeps
+        orig_scene = OriginalScene(self.root)
+        lidar_sweeps = orig_scene.cleaned_lidar_sweeps
 
-    @property
-    def unchanged_lidar_sweeps(self):
-        if hasattr(self, "_unchanged_lidar_sweeps"):
-            return self._unchanged_lidar_sweeps
+        if len(self.edited_details["deleted_indices_of_target"]) == 0:
+            # no deleted points
+            self._deleted_lidar_sweeps = [i - i for i in lidar_sweeps]
+            return self._deleted_lidar_sweeps
 
-        scene_details = OriginalScene(self.root).scene_details
-        ss = argoverse2.SweepSequence.from_sweeps(scene_details["sweeps"])
-
-        _, details = ss.export_to_voxel_grid(
-            voxel_size=scene_details.get("voxel_size", 0.2),
+        sweeps = argoverse2.SweepSequence.from_sweeps(lidar_sweeps)
+        _, details = sweeps.export_to_voxel_grid(
+            voxel_size=orig_scene.scene_details.get("voxel_size", 0.2),
             skip_color=True,
             return_details=True,
         )
-        original_indices = np.arange(len(ss.xyz))
+
+        original_indices = np.arange(len(sweeps.xyz))
         original_indices = original_indices[details["indices"]]
         original_indicess = np.split(original_indices, details["splits"][1:-1])
-
-        if len(self.edited_details["deleted_indices_of_target"]) == 0:
-            self._unchanged_lidar_sweeps = ss.sweeps
-            return self._unchanged_lidar_sweeps
 
         selected = []
         for i in self.edited_details["deleted_indices_of_target"]:
             selected.append(original_indicess[i])
         selected = np.sort(np.hstack(selected))
 
-        sweep_starts = np.r_[0, np.cumsum([len(s) for s in ss.sweeps])]
+        sweep_starts = np.r_[0, np.cumsum([len(s) for s in sweeps.sweeps])]
         starts = np.searchsorted(sweep_starts, selected, side="right") - 1
         splits = np.where(np.diff(starts) > 0)[0] + 1
         splits = np.r_[0, splits, len(starts)]
@@ -271,31 +318,20 @@ class EditedScene(Base, EditedDetailsMixin):
         # to local indices
         selected = selected - sweep_starts[starts]
 
-        self._unchanged_lidar_sweeps = ss.sweeps
-
+        self._deleted_lidar_sweeps = []
         for i, j in zip(splits[:-1], splits[1:]):
 
             s = starts[i]
-            sweep = ss.sweeps[s]
-            unchanged_sweep = sweep - sweep[selected[i:j]]
-            self._unchanged_lidar_sweeps[s] = unchanged_sweep
+            sweep = sweeps.sweeps[s]
+            deleted_sweep = sweep[selected[i:j]]
+            self._deleted_lidar_sweeps.append(deleted_sweep)
 
-        return self._unchanged_lidar_sweeps
+        return self._deleted_lidar_sweeps
 
     @property
-    def changed_lidar_sweeps(self):
-        if hasattr(self, "_changed_lidar_sweeps"):
-            return self._changed_lidar_sweeps
-
-        raws = self.raw_lidar_sweeps
-        unchangeds = self.unchanged_lidar_sweeps
-
-        self._changed_lidar_sweeps = []
-        for raw, unchanged in zip(raws, unchangeds):
-            changed_sweep = raw - unchanged
-            self._changed_lidar_sweeps.append(changed_sweep)
-
-        return self._changed_lidar_sweeps
+    def added_lidar_sweeps(self):
+        # how to form scan points on new inserted objects?
+        raise NotImplementedError
 
     def camera_change_map(
         self,
@@ -316,7 +352,7 @@ class EditedScene(Base, EditedDetailsMixin):
         for camera in self.cameras:
 
             img_seq = self.camera_sequence.get_a_camera(camera)
-            lidar_sweeps = self.raw_lidar_sweeps
+            lidar_sweeps = origin_scene.raw_lidar_sweeps
             lidar_sweeps = argoverse2.SweepSequence.from_sweeps(lidar_sweeps)
             lidar_sweeps = lidar_sweeps.align_timestamps(img_seq.timestamps)
             lidar_sweeps = lidar_sweeps.sweeps
