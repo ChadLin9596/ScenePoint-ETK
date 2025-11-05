@@ -384,7 +384,7 @@ class CameraSequence(ArgoMixin, array_data.Array):
 
         check_log_id(log_id)
 
-        if not np.iterable(cameras):
+        if isinstance(cameras, str):
             cameras = [cameras]
 
         # guarantee that all cameras are valid
