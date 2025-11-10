@@ -1,7 +1,10 @@
 """
-Argoverse2 dataset management module
+Argoverse2 dataset management module aiming to access sensor data
+through log ids.
+
 
 city:
+
     "ATX": "Austin, Texas"
     "DTW": "Detroit, Michigan"
     "MIA": "Miami, Florida"
@@ -9,7 +12,8 @@ city:
     "PIT": "Pittsburgh, PA"
     "WDC": "Washington, DC"
 
-city origin
+city origin:
+
     "ATX": (30.27464237939507, -97.7404457407424)
     "DTW": (42.29993066912924, -83.17555750783717)
     "MIA": (25.77452579915163, -80.19656914449405)

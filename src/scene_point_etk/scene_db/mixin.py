@@ -19,12 +19,16 @@ import py_utils.utils_segmentation as utils_segmentation
 class ScenePCDMixin:
     """
     a mixin class for scene PCD data.
+
+    ```
+    <root>
     ├── <Scene ID 00>
     │   └── <version name>
     │       └── scene.pcd  <- scene_filepath
     │
     ├── <Scene ID 01>
     └── ...
+    ```
     """
 
     scene_filepath = ""
@@ -37,7 +41,9 @@ class ScenePCDMixin:
         if not os.path.exists(self.scene_filepath):
             raise FileNotFoundError(f"{self.scene_filepath} does not exist")
 
+        default_dtype = np.dtype(argoverse2.CLOUD_COMPARE_DTYPE)
         self._scene_pcd = pcd.read(self.scene_filepath)
+        assert self._scene_pcd.dtype == default_dtype
         return self._scene_pcd.copy()
 
     @scene_pcd.setter
@@ -80,23 +86,32 @@ class ScenePCDMixin:
 class SceneDetailsMixin:
     """
     a mixin class for scene details data.
+
+    ```
+    <root>
     ├── <Scene ID 00>
     │   └── <version name>
     │       └── details.pkl  <- details_filepath
     │
     ├── <Scene ID 01>
     └── ...
+    ```
     """
 
     details_filepath = ""
 
     @property
     def scene_details(self):
+        if hasattr(self, "_scene_details"):
+            return self._scene_details
+
         if not os.path.exists(self.details_filepath):
             return None
 
         with open(self.details_filepath, "rb") as fd:
-            return pickle.load(fd)
+            self._scene_details = pickle.load(fd)
+
+        return self._scene_details
 
     @scene_details.setter
     def scene_details(self, details):
@@ -107,6 +122,9 @@ class SceneDetailsMixin:
 class CameraSequenceMixin:
     """
     a mixin class for camera sequence data.
+
+    ```
+    <root>
     ├── <Scene ID 00>
     │   │
     │   └── <version name>
@@ -122,6 +140,7 @@ class CameraSequenceMixin:
     │
     ├── <Scene ID 01>
     └── ...
+    ```
     """
 
     # separate `cameras_root` and `camera_seq_filepath` to allow
@@ -135,13 +154,13 @@ class CameraSequenceMixin:
             return self._camera_sequence
 
         if not os.path.exists(self.camera_seq_filepath):
-            raise FileNotFoundError(
-                f"{self.camera_seq_filepath} does not exist"
-            )
+            msg = f"{self.camera_seq_filepath} does not exist"
+            raise FileNotFoundError(msg)
 
         with open(self.camera_seq_filepath, "rb") as f:
             camera_sequence = pickle.load(f)
 
+        assert isinstance(camera_sequence, argoverse2.CameraSequence)
         self._camera_sequence = camera_sequence
         return self._camera_sequence
 
@@ -278,7 +297,6 @@ class CameraSequenceMixin:
         depth[valid_map] = xyz[:, 2]
 
         return depth
-
 
     @property
     def camera_point_indices_map(self):

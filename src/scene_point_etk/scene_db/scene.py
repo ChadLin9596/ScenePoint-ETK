@@ -20,6 +20,7 @@ import py_utils.visualization_pptk as vis_pptk
 
 class Base(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
     """
+    ```
     ├── <Scene ID 00>
     │   │
     │   └── <version name>
@@ -37,6 +38,7 @@ class Base(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
     │
     ├── <Scene ID 01>
     └── ...
+    ```
     """
 
     def __init__(self, scene_root, version):
@@ -60,7 +62,7 @@ class Base(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
             "scene.pcd": 0,
             "details.pkl": 0,
             "cam_sequence.pkl": 0,
-            "cameras": {}
+            "cameras": {},
         }
         if os.path.exists(self.scene_filepath):
             R["scene.pcd"] = os.path.getsize(self.scene_filepath)
@@ -105,6 +107,7 @@ class OriginalScene(Base):
     """
     based on Scene structure, but with fixed scene name "GT" and added
     the following structure:
+    ```
     ├── <Scene ID 00>
     │   │
     │   └── GT <- fixed <scene name> to "GT"
@@ -119,6 +122,7 @@ class OriginalScene(Base):
     │
     ├── <Scene ID 01>
     └── ...
+    ```
     """
 
     def __init__(self, scene_root):
@@ -180,11 +184,11 @@ class OriginalScene(Base):
         return self.scene_details["sweeps"]
 
 
-
 class EditedScene(Base, EditedDetailsMixin):
     """
     based on Scene structure, but assume the GT scene is already processed
     and has the following structure:
+    ```
     ├── <Scene ID 00>
     │   │
     │   └── <version name> <- can be any name but not "GT"
@@ -221,6 +225,7 @@ class EditedScene(Base, EditedDetailsMixin):
     │
     ├── <Scene ID 01>
     └── ...
+    ```
     """
 
     def __init__(self, scene_root, version):

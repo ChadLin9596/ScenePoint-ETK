@@ -1,3 +1,15 @@
+"""
+Argoverse2 dataset management module aiming to access sensor data
+through log ids.
+
+If users have set up `sensor_dataset_root` under
+`scene_point_etk/config.json`, the module will automatically  use this
+path to locate the sensor data.
+
+Otherwise, users need to call `set_sensor_root()` to manually set the
+sensor root path.
+"""
+
 import glob
 import json
 import os
@@ -5,8 +17,8 @@ import os
 import numpy as np
 import pyarrow.feather as feather
 
-SENSOR_ROOT = ""
-SENSOR_MAP = {}
+_SENSOR_ROOT = ""
+_SENSOR_MAP = {}
 
 
 def _get_log_id(path):
@@ -18,19 +30,47 @@ def _get_log_id(path):
 
 
 def set_sensor_root(sensor_root=None, overwrite=True):
+    """
+    Module-level function to initialize and setup the Argoverse2 sensor
+    dataset root directory and log id mapping.
 
-    global SENSOR_ROOT, SENSOR_MAP
+    ```
+    <sensor_root>
+        ├── 00a6ffc1-6ce9-3bc3-a060-6006e9893a1a  <- log_id
+        │   ├── annotations.feather
+        │   ├── calibration
+        │   ├── city_SE3_egovehicle.feather
+        │   ├── map
+        │   └── ... (1 more files)
+        ├── 01bb304d-7bd8-35f8-bbef-7086b688e35e
+        ├── 022af476-9937-3e70-be52-f65420d52703
+        └── ...
+    ```
+
+    Args:
+    - sensor_root (str | None, optional):
+        - Root directory of the Argoverse2 dataset.
+        If None, the value from `scene_point_etk/config.json` is used.
+
+    - overwrite (bool, optional):
+        - If True, update `scene_point_etk/config.json` with the
+        provided sensor_root.
+
+    """
+
+    global _SENSOR_ROOT, _SENSOR_MAP
 
     path_this_file = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(path_this_file, "..", "config.json")
 
-    # set the SENSOR_ROOT from either config.json or the provided sensor_root
+    # set the _SENSOR_ROOT from either config.json or the provided
+    # sensor_root
     if sensor_root is not None:
-        SENSOR_ROOT = sensor_root
+        _SENSOR_ROOT = sensor_root
     else:
         with open(config_path, "r") as f:
             config = json.load(f)
-            SENSOR_ROOT = config.get("sensor_dataset_root", "")
+            _SENSOR_ROOT = config.get("sensor_dataset_root", "")
 
     # update config.json if overwrite
     if sensor_root is not None and overwrite:
@@ -38,23 +78,38 @@ def set_sensor_root(sensor_root=None, overwrite=True):
             config = json.load(f)
 
         with open(config_path, "w") as f:
-            config["sensor_dataset_root"] = SENSOR_ROOT
+            config["sensor_dataset_root"] = _SENSOR_ROOT
             json.dump(config, f, indent=4)
 
     # build the SENSOR_MAP
-    paths = glob.glob(os.path.join(SENSOR_ROOT, "*"))
+    paths = glob.glob(os.path.join(_SENSOR_ROOT, "*"))
     for path in paths:
         log_id = _get_log_id(path)
-        SENSOR_MAP[log_id] = path
+        _SENSOR_MAP[log_id] = path
 
 
 set_sensor_root()
 
-###############################################################################
+########################################################################
 
 
 def check_log_id(log_id):
-    if log_id not in SENSOR_MAP:
+    """
+    Check if the log id can be located by this module.
+
+    for example:
+    ```python
+    >> import scene_point_etk.argoverse2 as av2
+    >> # the log id without '-'
+    >> log_id = "00a6ffc16ce93bc3a0606006e9893a1a"
+    >> av2.set_sensor_root(sensor_root="a correct directory")
+    >> av2.check_log_id(log_id) # no error
+    >> av2.set_sensor_root(sensor_root="an incorrect directory")
+    >> av2.check_log_id(log_id)
+    ValueError: Log id 00a6ffc16ce93bc3a0606006e9893a1a not found
+    ```
+    """
+    if log_id not in _SENSOR_MAP:
         raise ValueError(f"Log id {log_id} not found")
 
 
@@ -69,11 +124,18 @@ def check_city(city):
         raise ValueError(f"City {city} not found")
 
 
+########################################################################
+
+
 def list_log_ids():
-    return sorted(list(SENSOR_MAP.keys()))
+    """list over all available log ids"""
+    return sorted(list(_SENSOR_MAP.keys()))
 
 
 def list_log_ids_by_mode(mode="test"):
+    """list over all available log_ids for a category:
+    'train', 'val', 'test'
+    """
 
     path_this_file = os.path.dirname(os.path.abspath(__file__))
 
@@ -126,8 +188,12 @@ def list_sweep_files_by_log_id(log_id):
     return files
 
 
+########################################################################
+
+
 def get_root_from_log_id(log_id):
-    return SENSOR_MAP[log_id]
+    """return `<sensor_root>/<log_id>` path given a log id"""
+    return _SENSOR_MAP[log_id]
 
 
 def get_log_ids_from_city(city):
@@ -287,6 +353,9 @@ def get_ground_height_by_points(log_id, xyz, filled_value=np.nan):
 
     z[valid_I] = ground_height_points[xy[valid_I, 1], xy[valid_I, 0]]
     return z
+
+
+########################################################################
 
 
 class ArgoMixin:
