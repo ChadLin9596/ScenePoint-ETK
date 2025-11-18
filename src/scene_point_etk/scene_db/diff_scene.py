@@ -12,6 +12,7 @@ delete_info:
         annotations: <Annotation object> (optional, default None)
         margin: <float> (optional, default 0.0)
         indices: <list of int> (optional, default list())
+                 <dict: <list of int>> (optional)
 
     usage:
         `annotations` & `margin` get deleted points using
@@ -94,6 +95,10 @@ def get_deleted_pcd(scene_pcd, delete_info, return_mask=False):
 
     # delete by indices:
     for indices in delete_info.get("indices", []):
+
+        if isinstance(indices, dict):
+            indices = np.concatenate(list(indices.values()))
+
         indices = np.unique(indices).astype(np.int64)
         mask[indices] = True
 
