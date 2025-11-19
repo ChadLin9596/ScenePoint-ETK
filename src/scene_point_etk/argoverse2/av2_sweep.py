@@ -253,6 +253,24 @@ class SweepSequence(ArgoMixin, array_data.Timestamps):
 
         return other
 
+    def __getitem__(self, key):
+
+        other = super().__getitem__(key)
+        other._path = self._path
+        other.sweeps = [self.sweeps[i] for i in other.index]
+        other.coordinate = self.coordinate
+        return other
+
+    def __copy__(self):
+
+        c = self.__class__
+        other = c.__new__(c)
+        other._path = self._path
+        other.sweeps = copy.copy(self.sweeps)
+        other.coordinate = self.coordinate
+
+        return other
+
     @staticmethod
     def from_sweeps(sweeps):
 
