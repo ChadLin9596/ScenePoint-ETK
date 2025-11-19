@@ -18,8 +18,10 @@ authors = [
 urls = { "Homepage" = "https://github.com/ChadLin9596/ScenePoint-ETK" }
 requires-python = ">=3.7"
 dependencies = [
+    "PyYAML",
     "pyarrow",
     "scikit-learn",
+    "py-utils @ git+https://github.com/ChadLin9596/python_utils.git"
 ]
 
 [tool.setuptools.package-data]

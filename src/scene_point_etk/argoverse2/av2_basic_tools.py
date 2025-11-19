@@ -82,6 +82,7 @@ def set_sensor_root(sensor_root=None, overwrite=True):
             json.dump(config, f, indent=4)
 
     # build the SENSOR_MAP
+    _SENSOR_MAP.clear()
     paths = glob.glob(os.path.join(_SENSOR_ROOT, "*"))
     for path in paths:
         log_id = _get_log_id(path)

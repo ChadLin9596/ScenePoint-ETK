@@ -37,6 +37,7 @@ def set_patch_root(patch_root=None, overwrite=True):
     patch_classes = [i for i in patch_classes if os.path.isdir(i)]
     patch_classes = [os.path.basename(i) for i in patch_classes]
 
+    PATCH_MAP.clear()
     for patch_class in patch_classes:
 
         paths = glob.glob(os.path.join(PATCH_ROOT, patch_class, "*.pcd"))
@@ -45,9 +46,11 @@ def set_patch_root(patch_root=None, overwrite=True):
             name = os.path.basename(path).replace(".pcd", "")
             PATCH_MAP[(patch_class, name)] = path
 
+
 set_patch_root()
 
 ###############################################################################
+
 
 def list_valid_patch_keys():
     return sorted(list(PATCH_MAP.keys()))
@@ -69,5 +72,3 @@ def get_patch_path_from_key(key):
 def get_patch_from_key(key):
     path = get_patch_path_from_key(key)
     return pcd.read(path)
-
-

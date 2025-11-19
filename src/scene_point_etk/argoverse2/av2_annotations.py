@@ -59,7 +59,7 @@ class Annotations(ArgoMixin, array_data.TimePoseSequence):
         self.xyz = np.array(annotations[["tx_m", "ty_m", "tz_m"]])
         self.quaternion = np.array(annotations[["qx", "qy", "qz", "qw"]])
 
-        # array_data.TimePoseSequence
+        # Assigned annotations specific data columns
         self._data["width"] = annotations["width_m"]
         self._data["length"] = annotations["length_m"]
         self._data["height"] = annotations["height_m"]
