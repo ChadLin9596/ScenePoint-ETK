@@ -20,7 +20,6 @@ dynamic_objects_categories:
     - STROLLER
     - TRUCK
     - TRUCK_CAB
-    - TRUCK_CAP
     - VEHICULAR_TRAILER
     - WHEELCHAIR
     - WHEELED_DEVICE
