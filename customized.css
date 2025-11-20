@@ -1,0 +1,14 @@
+/* Fixed width, auto height */
+.carousel-img {
+  width: 600px;      /* change this */
+  height: auto;
+  display: block;
+  margin: 0 auto;    /* center in the item */
+}
+
+/* OR: full width of carousel, capped by height */
+.carousel-img {
+  width: 100%;
+  max-height: 400px; /* change this */
+  object-fit: contain;
+}
