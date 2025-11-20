@@ -50,6 +50,10 @@ $ source <directory of virtual environment>/bin/activate
 ### TODO
 
 * [ ] complete tutorials at examples
+    * [x] basic usage
+    * [ ] scalibitiy
+    * [ ] trackability
+    * [ ] portability
 * [ ] website deployment
     * [ ] project page
     * [ ] documentation
