@@ -249,7 +249,7 @@ def plot_multiple_pcds(*pcds, scale=[0, 100], color_map=None):
     """
 
     xyz, rgbas = _process_pcds(*pcds, scale=scale, color_map=color_map)
-    v = pptk.viewer(xyz, debug=True)
+    v = pptk.viewer(xyz, debug=False)
     v.attributes(*rgbas)
 
     return v
@@ -274,7 +274,7 @@ def plot_multiple_pcds_with_bboxes(
     rgbas = [np.vstack([rgba, bbox_rgba]) for rgba in rgbas]
 
     # Launch viewer
-    v = pptk.viewer(xyz, debug=True)
+    v = pptk.viewer(xyz, debug=False)
     v.attributes(*rgbas)
 
     return v
