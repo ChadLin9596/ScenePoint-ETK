@@ -19,6 +19,7 @@ Getting Started
 
    installation
    download
+   api/index
 
 
 .. toctree::

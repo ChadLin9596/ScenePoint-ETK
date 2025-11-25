@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Evaluation &#8212; scene_point_etk v.0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=47202671" />
+    <link rel="stylesheet" type="text/css" href="../_static/haiku.css?v=dfa0e015" />
+    <script src="../_static/documentation_options.js?v=e0de7bb5"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Visualization" href="visualization.html" />
+    <link rel="prev" title="Scene Data Base" href="scene_db.html" /> 
+  </head><body>
+      <div class="header" role="banner"><h1 class="heading"><a href="../index.html">
+          <span>scene_point_etk v.0.1.0 documentation</span></a></h1>
+        <h2 class="heading"><span>Evaluation</span></h2>
+      </div>
+      <div class="topnav" role="navigation" aria-label="Top">
+      
+        <p>
+        «&#160;&#160;<a href="scene_db.html">Scene Data Base</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="visualization.html">Visualization</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content" role="main">
+        
+        
+  <section id="evaluation">
+<h1>Evaluation<a class="headerlink" href="#evaluation" title="Link to this heading">¶</a></h1>
+<section id="a-point-cloud-based-metrics">
+<h2><strong>A</strong> - Point Cloud Based Metrics<a class="headerlink" href="#a-point-cloud-based-metrics" title="Link to this heading">¶</a></h2>
+<section id="a-chamfer-distance">
+<h3><em>a</em>. Chamfer Distance<a class="headerlink" href="#a-chamfer-distance" title="Link to this heading">¶</a></h3>
+<p><span class="math notranslate nohighlight">\(D_{C}(P, P^*) = \frac{1}{|P|} \sum_{p \in P} d(p, P^*)^2 + \frac{1}{|P'|} \sum_{p^* \in P^*} d(p^*, P)^2\)</span></p>
+<dl class="py function">
+<dt class="sig sig-object py" id="scene_point_etk.evaluation.chamfer_distance">
+<span class="sig-prename descclassname"><span class="pre">scene_point_etk.evaluation.</span></span><span class="sig-name descname"><span class="pre">chamfer_distance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point_cloud_1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point_cloud_2</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scene_point_etk.evaluation.chamfer_distance" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+<section id="b-hausdorff-distance">
+<h3><em>b</em>. Hausdorff Distance<a class="headerlink" href="#b-hausdorff-distance" title="Link to this heading">¶</a></h3>
+<p><span class="math notranslate nohighlight">\(D_{H}(P, P^*) = \max \left\{ \max_{p \in P} d(p, P^*), \max_{p^* \in P^*} d(p^*, P) \right\}\)</span></p>
+<dl class="py function">
+<dt class="sig sig-object py" id="scene_point_etk.evaluation.hausdorff_distance">
+<span class="sig-prename descclassname"><span class="pre">scene_point_etk.evaluation.</span></span><span class="sig-name descname"><span class="pre">hausdorff_distance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point_cloud_1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point_cloud_2</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scene_point_etk.evaluation.hausdorff_distance" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+<section id="c-modified-hausdorff-distance">
+<h3><em>c</em>. Modified Hausdorff Distance<a class="headerlink" href="#c-modified-hausdorff-distance" title="Link to this heading">¶</a></h3>
+<p><span class="math notranslate nohighlight">\(D_{MH}(P, P^*) = \max \left\{ \frac{1}{|P|} \sum_{p \in P} d(p, P^*), \frac{1}{|P^*|} \sum_{p^* \in P^*} d(p^*, P) \right\}\)</span></p>
+<dl class="py function">
+<dt class="sig sig-object py" id="scene_point_etk.evaluation.modified_hausdorff_distance">
+<span class="sig-prename descclassname"><span class="pre">scene_point_etk.evaluation.</span></span><span class="sig-name descname"><span class="pre">modified_hausdorff_distance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point_cloud_1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point_cloud_2</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scene_point_etk.evaluation.modified_hausdorff_distance" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+<section id="d-median-point-distance">
+<h3><em>d</em>. Median Point Distance<a class="headerlink" href="#d-median-point-distance" title="Link to this heading">¶</a></h3>
+<p><span class="math notranslate nohighlight">\(D_{MP}(P, P^*) = \max \left\{ \underset{p \in P}{\text{median}}\ d(p, P^*), \underset{p^* \in P^*}{\text{median}}\ d(p^*, P) \right\}\)</span></p>
+<dl class="py function">
+<dt class="sig sig-object py" id="scene_point_etk.evaluation.median_point_distance">
+<span class="sig-prename descclassname"><span class="pre">scene_point_etk.evaluation.</span></span><span class="sig-name descname"><span class="pre">median_point_distance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point_cloud_1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point_cloud_2</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scene_point_etk.evaluation.median_point_distance" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+</section>
+</section>
+
+
+      </div>
+      <div class="bottomnav" role="navigation" aria-label="Bottom">
+      
+        <p>
+        «&#160;&#160;<a href="scene_db.html">Scene Data Base</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="visualization.html">Visualization</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Chad Lin.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.4.7.
+    </div>
+  </body>
+</html>

@@ -52,6 +52,10 @@ file structure:
 Download `SceneEdited-Patches`_ (26MB)
 --------------------------------------
 
+.. raw:: html
+
+    <iframe src="https://widgets.figshare.com/articles/30702329/embed?show_title=1" width="568" height="351" allowfullscreen frameborder="0"></iframe>
+
 .. code-block:: bash
 
     $ wget --content-disposition https://ndownloader.figshare.com/files/59816492
@@ -97,6 +101,10 @@ file structure:
 
 Download `SceneEdited-Scenes`_ (46GB)
 --------------------------------------
+
+.. raw:: html
+
+    <iframe src="https://widgets.figshare.com/articles/30702929/embed?show_title=1" width="568" height="351" allowfullscreen frameborder="0"></iframe>
 
 .. code-block:: bash
 
