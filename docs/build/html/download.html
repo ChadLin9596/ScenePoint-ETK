@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Download SceneEdited Dataset &#8212; scene_point_etk v.0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=47202671" />
+    <link rel="stylesheet" type="text/css" href="_static/haiku.css?v=dfa0e015" />
+    <script src="_static/documentation_options.js?v=e0de7bb5"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Installation" href="installation.html" /> 
+  </head><body>
+      <div class="header" role="banner"><h1 class="heading"><a href="index.html">
+          <span>scene_point_etk v.0.1.0 documentation</span></a></h1>
+        <h2 class="heading"><span>Download SceneEdited Dataset</span></h2>
+      </div>
+      <div class="topnav" role="navigation" aria-label="Top">
+      
+        <p>
+        «&#160;&#160;<a href="installation.html">Installation</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="index.html">Contents</a>
+        </p>
+
+      </div>
+      <div class="content" role="main">
+        
+        
+  <section id="download-sceneedited-dataset">
+<h1>Download SceneEdited Dataset<a class="headerlink" href="#download-sceneedited-dataset" title="Link to this heading">¶</a></h1>
+<section id="download-argoverse-dataset-900-gb">
+<h2>Download <a class="reference external" href="https://www.argoverse.org/">Argoverse dataset</a> (900 GB)<a class="headerlink" href="#download-argoverse-dataset-900-gb" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># dry run (fast testing, no file will be downloaded)</span>
+<span class="o">(</span>your<span class="w"> </span>env<span class="o">)</span>$<span class="w"> </span>python<span class="w"> </span>ScenePoint-ETK/scripts/00.download_sensor_dataset.py<span class="w"> </span>&lt;where<span class="w"> </span>you<span class="w"> </span>want<span class="w"> </span>to<span class="w"> </span>store&gt;<span class="w"> </span>--dry
+
+<span class="c1"># actual download</span>
+<span class="o">(</span>your<span class="w"> </span>env<span class="o">)</span>$<span class="w"> </span>python<span class="w"> </span>ScenePoint-ETK/scripts/00.download_sensor_dataset.py<span class="w"> </span>&lt;where<span class="w"> </span>you<span class="w"> </span>want<span class="w"> </span>to<span class="w"> </span>store&gt;
+</pre></div>
+</div>
+<p>file structure:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>&lt;where<span class="w"> </span>you<span class="w"> </span>want<span class="w"> </span>to<span class="w"> </span>store&gt;
+├──<span class="w"> </span>00a6ffc1-6ce9-3bc3-a060-6006e9893a1a
+│<span class="w">   </span>├──<span class="w"> </span>annotations.feather
+│<span class="w">   </span>├──<span class="w"> </span>calibration
+│<span class="w">   </span>│<span class="w">   </span>├──<span class="w"> </span>egovehicle_SE3_sensor.feather
+│<span class="w">   </span>│<span class="w">   </span>└──<span class="w"> </span>intrinsics.feather
+│<span class="w">   </span>├──<span class="w"> </span>city_SE3_egovehicle.feather
+│<span class="w">   </span>├──<span class="w"> </span>map
+│<span class="w">   </span>│<span class="w">   </span>├──<span class="w"> </span>00a6ffc1-6ce9-3bc3-a060-6006e9893a1a_ground_height_surface____PIT.npy
+│<span class="w">   </span>│<span class="w">   </span>├──<span class="w"> </span>00a6ffc1-6ce9-3bc3-a060-6006e9893a1a___img_Sim2_city.json
+│<span class="w">   </span>│<span class="w">   </span>└──<span class="w"> </span>log_map_archive_00a6ffc1-6ce9-3bc3-a060-6006e9893a1a____PIT_city_31785.json
+│<span class="w">   </span>└──<span class="w"> </span>sensors
+│<span class="w">       </span>├──<span class="w"> </span>cameras
+│<span class="w">       </span>│<span class="w">   </span>├──<span class="w"> </span>ring_front_center
+│<span class="w">       </span>│<span class="w">   </span>│<span class="w">   </span>├──<span class="w"> </span><span class="m">315967376899927209</span>.jpg
+│<span class="w">       </span>│<span class="w">   </span>│<span class="w">   </span>├──<span class="w"> </span><span class="m">315967376949927221</span>.jpg
+│<span class="w">       </span>│<span class="w">   </span>│<span class="w">   </span>└──<span class="w"> </span>...<span class="w"> </span><span class="o">(</span><span class="m">317</span><span class="w"> </span>more<span class="w"> </span>files<span class="o">)</span>
+│<span class="w">       </span>│<span class="w">   </span>├──<span class="w"> </span>ring_front_left
+│<span class="w">       </span>│<span class="w">   </span>├──<span class="w"> </span>ring_front_right
+│<span class="w">       </span>│<span class="w">   </span>├──<span class="w"> </span>ring_rear_left
+│<span class="w">       </span>│<span class="w">   </span>├──<span class="w"> </span>ring_rear_right
+│<span class="w">       </span>│<span class="w">   </span>├──<span class="w"> </span>ring_side_left
+│<span class="w">       </span>│<span class="w">   </span>├──<span class="w"> </span>ring_side_right
+│<span class="w">       </span>│<span class="w">   </span>├──<span class="w"> </span>stereo_front_left
+│<span class="w">       </span>│<span class="w">   </span>└──<span class="w"> </span>stereo_front_right
+│<span class="w">       </span>└──<span class="w"> </span>lidar
+│<span class="w">           </span>├──<span class="w"> </span><span class="m">315967376859506000</span>.feather
+│<span class="w">           </span>├──<span class="w"> </span><span class="m">315967376959702000</span>.feather
+│<span class="w">           </span>└──<span class="w"> </span>...<span class="w"> </span><span class="o">(</span><span class="m">155</span><span class="w"> </span>more<span class="w"> </span>files<span class="o">)</span>
+├──<span class="w"> </span>01bb304d-7bd8-35f8-bbef-7086b688e35e
+├──<span class="w"> </span>022af476-9937-3e70-be52-f65420d52703
+└──<span class="w"> </span>...<span class="w"> </span><span class="o">(</span><span class="m">847</span><span class="w"> </span>more<span class="w"> </span>files<span class="o">)</span>
+</pre></div>
+</div>
+</section>
+<section id="download-sceneedited-patches-26mb">
+<h2>Download <a class="reference external" href="https://figshare.com/articles/dataset/SceneEdited_-_Patch_Data_Base/30702329?file=59816492">SceneEdited-Patches</a> (26MB)<a class="headerlink" href="#download-sceneedited-patches-26mb" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>wget<span class="w"> </span>--content-disposition<span class="w"> </span>https://ndownloader.figshare.com/files/59816492
+$<span class="w"> </span>unzip<span class="w"> </span>SceneEdited-patches.zip
+</pre></div>
+</div>
+<p>file structure:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>patches
+├──<span class="w"> </span>BOLLARD
+│<span class="w">   </span>├──<span class="w"> </span>0339f59e88.pcd
+│<span class="w">   </span>└──<span class="w"> </span>...<span class="w"> </span><span class="o">(</span><span class="m">67</span><span class="w"> </span>more<span class="w"> </span>files<span class="o">)</span>
+├──<span class="w"> </span>CONSTRUCTION_BARREL
+│<span class="w">   </span>├──<span class="w"> </span>003304f27c.pcd
+│<span class="w">   </span>└──<span class="w"> </span>...<span class="w"> </span><span class="o">(</span><span class="m">13</span><span class="w"> </span>more<span class="w"> </span>files<span class="o">)</span>
+├──<span class="w"> </span>CONSTRUCTION_CONE
+│<span class="w">   </span>└──<span class="w"> </span>5a8f1bcf62.pcd
+├──<span class="w"> </span>MESSAGE_BOARD_TRAILER
+│<span class="w">   </span>├──<span class="w"> </span>039f2a05e2.pcd
+│<span class="w">   </span>└──<span class="w"> </span>...<span class="w"> </span><span class="o">(</span><span class="m">6</span><span class="w"> </span>more<span class="w"> </span>files<span class="o">)</span>
+├──<span class="w"> </span>MOBILE_PEDESTRIAN_CROSSING_SIGN
+│<span class="w">   </span>├──<span class="w"> </span>1b7656f426.pcd
+│<span class="w">   </span>└──<span class="w"> </span>...<span class="w"> </span><span class="o">(</span><span class="m">3</span><span class="w"> </span>more<span class="w"> </span>files<span class="o">)</span>
+├──<span class="w"> </span>OFFICIAL_SIGNALER
+│<span class="w">   </span>├──<span class="w"> </span>0f65618f69.pcd
+│<span class="w">   </span>└──<span class="w"> </span>...<span class="w"> </span><span class="o">(</span><span class="m">4</span><span class="w"> </span>more<span class="w"> </span>files<span class="o">)</span>
+├──<span class="w"> </span>SIGN
+│<span class="w">   </span>├──<span class="w"> </span>006d09a99c.pcd
+│<span class="w">   </span>└──<span class="w"> </span>...<span class="w"> </span><span class="o">(</span><span class="m">441</span><span class="w"> </span>more<span class="w"> </span>files<span class="o">)</span>
+├──<span class="w"> </span>STOP_SIGN
+│<span class="w">   </span>├──<span class="w"> </span>0040351bcf.pcd
+│<span class="w">   </span>└──<span class="w"> </span>...<span class="w"> </span><span class="o">(</span><span class="m">705</span><span class="w"> </span>more<span class="w"> </span>files<span class="o">)</span>
+├──<span class="w"> </span>TRAFFIC_LIGHT_TRAILER
+│<span class="w">   </span>└──<span class="w"> </span>5ee54ec11d.pcd
+├──<span class="w"> </span>TRUCK_CAB
+│<span class="w">   </span>├──<span class="w"> </span>026743ebb8.pcd
+│<span class="w">   </span>└──<span class="w"> </span>...<span class="w"> </span><span class="o">(</span><span class="m">47</span><span class="w"> </span>more<span class="w"> </span>files<span class="o">)</span>
+└──<span class="w"> </span>VEHICULAR_TRAILER
+<span class="w">    </span>├──<span class="w"> </span>00b24fff49.pcd
+<span class="w">    </span>└──<span class="w"> </span>...<span class="w"> </span><span class="o">(</span><span class="m">171</span><span class="w"> </span>more<span class="w"> </span>files<span class="o">)</span>
+</pre></div>
+</div>
+</section>
+<section id="download-sceneedited-scenes-46gb">
+<h2>Download <a class="reference external" href="https://figshare.com/articles/dataset/SceneEdited_-_Scene_Data_Base/30702929?file=59818052">SceneEdited-Scenes</a> (46GB)<a class="headerlink" href="#download-sceneedited-scenes-46gb" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>wget<span class="w"> </span>--content-disposition<span class="w"> </span>https://ndownloader.figshare.com/files/59818052
+$<span class="w"> </span>unzip<span class="w"> </span>SceneEdited-scenes.zip
+</pre></div>
+</div>
+<p>file structure:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>Scenes
+├──<span class="w"> </span>00a6ffc16ce93bc3a0606006e9893a1a
+│<span class="w">   </span>├──<span class="w"> </span>GT
+│<span class="w">   </span>│<span class="w">   </span>└──<span class="w"> </span>details.pkl
+│<span class="w">   </span>├──<span class="w"> </span>v0.add
+│<span class="w">   </span>│<span class="w">   </span>└──<span class="w"> </span>details.pkl
+│<span class="w">   </span>├──<span class="w"> </span>v0.delete
+│<span class="w">   </span>│<span class="w">   </span>└──<span class="w"> </span>details.pkl
+│<span class="w">   </span>├──<span class="w"> </span>v0.manually_removed
+│<span class="w">   </span>│<span class="w">   </span>└──<span class="w"> </span>details.pkl
+│<span class="w">   </span>└──<span class="w"> </span>v0.overall
+│<span class="w">       </span>└──<span class="w"> </span>details.pkl
+├──<span class="w"> </span>01bb304d7bd835f8bbef7086b688e35e
+│<span class="w">   </span>├──<span class="w"> </span>GT
+│<span class="w">   </span>│<span class="w">   </span>└──<span class="w"> </span>details.pkl
+│<span class="w">   </span>├──<span class="w"> </span>v0.add
+│<span class="w">   </span>│<span class="w">   </span>└──<span class="w"> </span>details.pkl
+│<span class="w">   </span>├──<span class="w"> </span>v0.delete
+│<span class="w">   </span>│<span class="w">   </span>└──<span class="w"> </span>details.pkl
+│<span class="w">   </span>└──<span class="w"> </span>v0.overall
+│<span class="w">       </span>└──<span class="w"> </span>details.pkl
+├──<span class="w"> </span>022af47699373e70be52f65420d52703
+├──<span class="w"> </span>02678d04cc9f31489f951ba66347dff9
+└──<span class="w"> </span>...<span class="w"> </span><span class="o">(</span><span class="m">843</span><span class="w"> </span>more<span class="w"> </span>files<span class="o">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+      </div>
+      <div class="bottomnav" role="navigation" aria-label="Bottom">
+      
+        <p>
+        «&#160;&#160;<a href="installation.html">Installation</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="index.html">Contents</a>
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Chad Lin.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.4.7.
+    </div>
+  </body>
+</html>
