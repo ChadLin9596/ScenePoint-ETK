@@ -187,3 +187,15 @@ $ source <directory of virtual environment>/bin/activate
     * [ ] documentation
 * [x] release v0 dataset
 * [ ] more unittests
+
+### Citation
+
+```
+@InProceedings{SceneEdited,
+    author    = {Lin, Chun-Jung and Chin, Tat-Jun and Garg, Sourav and Dayoub, Feras},
+    title     = {SceneEdited: A City-Scale Benchmark for 3D HD Map Updating via Image-Guided Change Detection},
+    booktitle = {Proceedings of the Winter Conference on Applications of Computer Vision (WACV)},
+    month     = {March},
+    year      = {2026}
+}
+```
