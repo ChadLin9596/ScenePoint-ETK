@@ -301,6 +301,37 @@
     </section>
     <!-- End teaser video -->
 
+    <!-- Comparison Section -->
+    <section class="section">
+      <div class="container is-max-desktop">
+        <h2 class="title is-3 has-text-centered">Outdated Scene vs Updated Scene</h2>
+
+        <p class="has-text-centered is-size-6">
+        </p>
+
+        <div class="comparison" style="margin-top:30px; display:flex; flex-direction:column; align-items:center;">
+          <div class="compare-container" id="container"
+            style="position:relative; width:100%; max-width:960px; aspect-ratio:1920/1043; border:2px solid white; overflow:hidden;">
+
+            <video src="media/updated.mp4" autoplay loop muted
+              style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover;"></video>
+
+            <div class="overlay" id="overlay1"
+              style="position:absolute; top:0; left:0; width:100%; height:100%; clip-path:inset(0 50% 0 0);">
+              <video id="overlayVideo" src="media/outdated.mp4" autoplay loop muted
+                style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover;"></video>
+            </div>
+
+            <div class="slider" id="slider1"
+              style="position:absolute; top:0; left:50%; width:4px; height:100%; background:rgb(255, 123, 123); z-index:3; cursor:ew-resize;">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- End Comparison Section -->
+
+
     <!-- Paper abstract -->
     <section class="section hero is-light">
       <div class="container is-max-desktop">
@@ -493,6 +524,33 @@
     <!-- You can add a tracker to track page visits by creating an account at statcounter.com -->
 
     <!-- End of Statcounter Code -->
+
+
+    <!-- video with slide bar-->>
+    <script>
+      function setupSlider(containerId, overlayVideoId, sliderId) {
+        const container = document.getElementById(containerId);
+        const overlayVideo = document.getElementById(overlayVideoId);
+        const slider = document.getElementById(sliderId);
+
+        let isSliding = false;
+
+        container.addEventListener("mousedown", () => isSliding = true);
+        container.addEventListener("mouseup", () => isSliding = false);
+        container.addEventListener("mouseleave", () => isSliding = false);
+        container.addEventListener("mousemove", (e) => {
+          if (!isSliding) return;
+          const rect = container.getBoundingClientRect();
+          let offsetX = e.clientX - rect.left;
+          offsetX = Math.max(0, Math.min(offsetX, rect.width));
+          const percent = (offsetX / rect.width) * 100;
+          slider.style.left = `${percent}%`;
+          overlayVideo.style.clipPath = `inset(0 ${100 - percent}% 0 0)`;
+        });
+      }
+
+      setupSlider("container", "overlayVideo", "slider1");
+    </script>
 
 </body>
 
