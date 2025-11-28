@@ -563,11 +563,12 @@ class EditedDetailsMixin:
             off = np.r_[x_min, y_min, z_min] - (-1.0 * np.r_[lx, ly, lz] / 2.0)
 
             # (8, 3)
-            vertice = visualization_pptk.make_bounding_box_vertices(lx, ly, lz)
-            vertice += off
+            args = (lx, ly, lz)
+            vertices = visualization_pptk.make_bounding_box_vertices(*args)
+            vertices = vertices + off
+            vertices = np.sum(vertices[:, None, :] * R.T, axis=-1) + mean
+            bounding_boxes.append(vertices)
 
-            vertice = np.sum(vertice[:, None, :] * R.T, axis=-1) + mean
-            bounding_boxes.append(vertice)
         return bounding_boxes
 
     def deleted_bounding_boxes(self, margin=0.0):
@@ -595,9 +596,10 @@ class EditedDetailsMixin:
             off = np.r_[x_min, y_min, z_min] - (-1.0 * np.r_[lx, ly, lz] / 2.0)
 
             # (8, 3)
-            vertice = visualization_pptk.make_bounding_box_vertices(lx, ly, lz)
-            vertice = vertice + off
-            vertice = np.sum(vertice[:, None, :] * R.T, axis=-1) + mean
-            bounding_boxes.append(vertice)
+            args = (lx, ly, lz)
+            vertices = visualization_pptk.make_bounding_box_vertices(*args)
+            vertices = vertices + off
+            vertices = np.sum(vertices[:, None, :] * R.T, axis=-1) + mean
+            bounding_boxes.append(vertices)
 
         return bounding_boxes

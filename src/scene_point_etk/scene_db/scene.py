@@ -134,22 +134,21 @@ class OriginalScene(Base):
         # override ScenePCDMixin.scene_pcd to generate scene.pcd from
         # scene_details if scene.pcd not exists
 
-        if hasattr(self, "_scene_pcd"):
-            return self._scene_pcd.copy()
+        if os.path.exists(self.scene_filepath):
+            return super().scene_pcd
 
         # generate scene.pcd if not exists
         # the generated scene.pcd will be cached for future use
         # the generated scene.pcd should be identical if the details.pkl
         # is not changed
-        if not os.path.exists(self.scene_filepath):
-            details = self.scene_details
-            voxel_size = details.get("voxel_size", 0.2)
+        details = self.scene_details
+        voxel_size = details.get("voxel_size", 0.2)
 
-            sweeps = argoverse2.SweepSequence.from_sweeps(details["sweeps"])
-            scene = sweeps.export_to_voxel_grid(voxel_size=voxel_size)
-            pcd.write(self.scene_filepath, scene)
+        sweeps = argoverse2.SweepSequence.from_sweeps(details["sweeps"])
+        scene = sweeps.export_to_voxel_grid(voxel_size=voxel_size)
+        pcd.write(self.scene_filepath, scene)
 
-        self._scene_pcd = pcd.read(self.scene_filepath)
+        self._scene_pcd = scene
         return self._scene_pcd.copy()
 
     @scene_pcd.setter
@@ -261,19 +260,17 @@ class EditedScene(Base, EditedDetailsMixin):
         # note that the way to generate scene.pcd is different from
         # OriginalScene
 
-        if hasattr(self, "_scene_pcd"):
-            return self._scene_pcd.copy()
+        if os.path.exists(self.scene_filepath):
+            return super().scene_pcd
 
-        if not os.path.exists(self.scene_filepath):
+        original_scene = OriginalScene(self.root)
+        scene = diff_scene.apply_change_info_to_target_pcd(
+            original_scene.scene_pcd,
+            self.scene_details,
+        )
+        pcd.write(self.scene_filepath, scene)
 
-            original_scene = OriginalScene(self.root)
-            scene = diff_scene.apply_change_info_to_target_pcd(
-                original_scene.scene_pcd,
-                self.scene_details,
-            )
-            pcd.write(self.scene_filepath, scene)
-
-        self._scene_pcd = pcd.read(self.scene_filepath)
+        self._scene_pcd = scene
         return self._scene_pcd.copy()
 
     @scene_pcd.setter
