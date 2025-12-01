@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>02 Configure scene_point_etk &#8212; scene_point_etk v.0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=47202671" />
+    <link rel="stylesheet" type="text/css" href="../_static/haiku.css?v=dfa0e015" />
+    <script src="../_static/documentation_options.js?v=e0de7bb5"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="00 Scene Data Base" href="../basic_usage/00.html" />
+    <link rel="prev" title="01 Download SceneEdited Dataset" href="01_download.html" /> 
+  </head><body>
+      <div class="header" role="banner"><h1 class="heading"><a href="../index.html">
+          <span>scene_point_etk v.0.1.0 documentation</span></a></h1>
+        <h2 class="heading"><span>02 Configure scene_point_etk</span></h2>
+      </div>
+      <div class="topnav" role="navigation" aria-label="Top">
+      
+        <p>
+        «&#160;&#160;<a href="01_download.html">01 Download SceneEdited Dataset</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="../basic_usage/00.html">00 Scene Data Base</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content" role="main">
+        
+        
+  <section id="configure-scene-point-etk">
+<h1>02 Configure scene_point_etk<a class="headerlink" href="#configure-scene-point-etk" title="Link to this heading">¶</a></h1>
+<p>After installing and downloading the dataset, you need to configure
+<em>scene_point_etk</em> to point to the dataset location on your machine. It
+only need to be done once.</p>
+<section id="argoverse-dataset">
+<h2>Argoverse Dataset<a class="headerlink" href="#argoverse-dataset" title="Link to this heading">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">scene_point_etk.argoverse2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">argoverse2</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">argoverse2</span><span class="o">.</span><span class="n">list_log_ids</span><span class="p">()</span>
+<span class="go">[]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">argoverse2</span><span class="o">.</span><span class="n">set_data_root</span><span class="p">(</span><span class="s2">&quot;&lt;where you stored the dataset&gt;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">argoverse2</span><span class="o">.</span><span class="n">list_log_ids</span><span class="p">()</span>
+<span class="go">[</span>
+<span class="go">    &#39;00a6ffc16ce93bc3a0606006e9893a1a&#39;,</span>
+<span class="go">    &#39;01bb304d7bd835f8bbef7086b688e35e&#39;,</span>
+<span class="go">    &#39;022af47699373e70be52f65420d52703&#39;,</span>
+<span class="go">    ...</span>
+<span class="go">]</span>
+</pre></div>
+</div>
+</section>
+<section id="sceneedited-patches">
+<h2>SceneEdited - Patches<a class="headerlink" href="#sceneedited-patches" title="Link to this heading">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">scene_point_etk.patch_db</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">patch_db</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">patch_db</span><span class="o">.</span><span class="n">list_valid_patch_keys</span><span class="p">()</span>
+<span class="go">[]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">patch_db</span><span class="o">.</span><span class="n">set_patch_root</span><span class="p">(</span><span class="s2">&quot;&lt;where you stored the dataset&gt;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">patch_db</span><span class="o">.</span><span class="n">list_valid_patch_keys</span><span class="p">()</span>
+<span class="go">[</span>
+<span class="go">    (&#39;BOLLARD&#39;, &#39;0339f59e88&#39;),</span>
+<span class="go">    (&#39;BOLLARD&#39;, &#39;0554976c9c&#39;),</span>
+<span class="go">    (&#39;BOLLARD&#39;, &#39;05a24ecb3d&#39;),</span>
+<span class="go">    ...</span>
+<span class="go">]</span>
+</pre></div>
+</div>
+</section>
+<section id="sceneedited-scenes">
+<h2>SceneEdited - Scenes<a class="headerlink" href="#sceneedited-scenes" title="Link to this heading">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">scene_point_etk.scene_db</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">scene_db</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scene_db</span><span class="o">.</span><span class="n">list_scene_ids</span><span class="p">()</span>
+<span class="go">[]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scene_db</span><span class="o">.</span><span class="n">set_scene_root</span><span class="p">(</span><span class="s2">&quot;&lt;where you stored the dataset&gt;&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scene_db</span><span class="o">.</span><span class="n">list_scene_ids</span><span class="p">()</span>
+<span class="go">[</span>
+<span class="go">    &#39;00a6ffc16ce93bc3a0606006e9893a1a&#39;,</span>
+<span class="go">    &#39;01bb304d7bd835f8bbef7086b688e35e&#39;,</span>
+<span class="go">    &#39;022af47699373e70be52f65420d52703&#39;,</span>
+<span class="go">    ...</span>
+<span class="go">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scene_db</span><span class="o">.</span><span class="n">list_scene_version_pairs</span><span class="p">()</span>
+<span class="go">[</span>
+<span class="go">    (&#39;00a6ffc16ce93bc3a0606006e9893a1a&#39;, &#39;v0.add&#39;),</span>
+<span class="go">    (&#39;00a6ffc16ce93bc3a0606006e9893a1a&#39;, &#39;v0.delete&#39;),</span>
+<span class="go">    (&#39;00a6ffc16ce93bc3a0606006e9893a1a&#39;, &#39;v0.manually_removed&#39;),</span>
+<span class="go">    (&#39;00a6ffc16ce93bc3a0606006e9893a1a&#39;, &#39;v0.overall&#39;),</span>
+<span class="go">    (&#39;01bb304d7bd835f8bbef7086b688e35e&#39;, &#39;v0.add&#39;),</span>
+<span class="go">    ...</span>
+<span class="go">]</span>
+</pre></div>
+</div>
+<p>For more details about configuration, please refer to <a class="reference external" href="https://github.com/ChadLin9596/ScenePoint-ETK/blob/main/examples/01.setup_env_path.ipynb">examples/01.setup_env_path.ipynb</a></p>
+</section>
+</section>
+
+
+      </div>
+      <div class="bottomnav" role="navigation" aria-label="Bottom">
+      
+        <p>
+        «&#160;&#160;<a href="01_download.html">01 Download SceneEdited Dataset</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="../index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="../basic_usage/00.html">00 Scene Data Base</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Chad Lin.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.4.7.
+    </div>
+  </body>
+</html>

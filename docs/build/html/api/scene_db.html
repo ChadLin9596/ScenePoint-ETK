@@ -36,6 +36,95 @@
         
   <section id="scene-data-base">
 <h1>Scene Data Base<a class="headerlink" href="#scene-data-base" title="Link to this heading">¶</a></h1>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Link to this heading">¶</a></h2>
+<section id="module-level">
+<h3>Module Level<a class="headerlink" href="#module-level" title="Link to this heading">¶</a></h3>
+<dl class="py function">
+<dt class="sig sig-object py" id="scene_point_etk.scene_db.set_scene_root">
+<span class="sig-prename descclassname"><span class="pre">scene_point_etk.scene_db.</span></span><span class="sig-name descname"><span class="pre">set_scene_root</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scene_root</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overwrite</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scene_point_etk.scene_db.set_scene_root" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+<section id="scene-ids">
+<h3>Scene IDs<a class="headerlink" href="#scene-ids" title="Link to this heading">¶</a></h3>
+<dl class="py function">
+<dt class="sig sig-object py" id="scene_point_etk.scene_db.list_scene_ids">
+<span class="sig-prename descclassname"><span class="pre">scene_point_etk.scene_db.</span></span><span class="sig-name descname"><span class="pre">list_scene_ids</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#scene_point_etk.scene_db.list_scene_ids" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="scene_point_etk.scene_db.list_versions_by_scene_id">
+<span class="sig-prename descclassname"><span class="pre">scene_point_etk.scene_db.</span></span><span class="sig-name descname"><span class="pre">list_versions_by_scene_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scene_id</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scene_point_etk.scene_db.list_versions_by_scene_id" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="scene_point_etk.scene_db.list_scene_version_pairs">
+<span class="sig-prename descclassname"><span class="pre">scene_point_etk.scene_db.</span></span><span class="sig-name descname"><span class="pre">list_scene_version_pairs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scene_ids</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">versions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scene_point_etk.scene_db.list_scene_version_pairs" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+</section>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">¶</a></h2>
+<p>Basic Scene structure:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>├── &lt;Scene ID 00&gt;
+│   │
+│   └── &lt;version name&gt;
+│       ├── details.pkl
+│       ├── scene.pcd
+│       └── cameras
+│           ├── cam_sequence.pkl
+│           ├── &lt;camera name 1&gt;
+│           │   └── sparse_point_indices
+│           │       ├── &lt;point indices 1&gt;.npy
+│           │       └── ...
+│           │
+│           ├── &lt;camera name 2&gt;
+│           └── ...
+│
+├── &lt;Scene ID 01&gt;
+└── ...
+</pre></div>
+</div>
+<dl class="py class">
+<dt class="sig sig-object py" id="scene_point_etk.scene_db.scene.OriginalScene">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">scene_point_etk.scene_db.scene.</span></span><span class="sig-name descname"><span class="pre">OriginalScene</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scene_root</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scene_point_etk.scene_db.scene.OriginalScene" title="Link to this definition">¶</a></dt>
+<dd><p>based on the Scene structure, but with fixed scene name “GT”:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>├── &lt;Scene ID 00&gt;
+│   │
+│   └── GT &lt;- fixed &lt;scene name&gt; to &quot;GT&quot;
+│       ├── details.pkl &lt;- (custom format)
+│       ├── scene.pcd
+│       └── cameras
+│           └── ...
+│
+├── &lt;Scene ID 01&gt;
+└── ...
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="scene_point_etk.scene_db.scene.EditedScene">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">scene_point_etk.scene_db.scene.</span></span><span class="sig-name descname"><span class="pre">EditedScene</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scene_root</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">version</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scene_point_etk.scene_db.scene.EditedScene" title="Link to this definition">¶</a></dt>
+<dd><p>based on Scene structure, but assume the GT scene is already processed
+and has the following structure:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>├── &lt;Scene ID 00&gt;
+│   │
+│   └── &lt;version name&gt; &lt;- can be any name but not &quot;GT&quot;
+│       ├── details.pkl &lt;- (custom format)
+│       ├── scene.pcd
+│       └── cameras
+│           └── ...
+│
+├── &lt;Scene ID 01&gt;
+└── ...
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
 </section>
 
 

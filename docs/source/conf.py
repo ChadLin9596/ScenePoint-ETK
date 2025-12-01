@@ -30,3 +30,4 @@ exclude_patterns = []
 
 html_theme = "haiku"
 html_static_path = []
+autodoc_member_order = "bysource"

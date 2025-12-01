@@ -11,20 +11,31 @@ scene_point_etk documentation
 
 `GitHub Repository`_
 
-Getting Started
-===============
+Setting Up
+==========
 
 .. toctree::
    :maxdepth: 1
 
-   installation
-   download
-   api/index
+   setup/00_installation
+   setup/01_download
+   setup/02_configure
 
+Basic Usage
+===========
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 1
+
+   basic_usage/00
+
+Interface Reference
+===================
+
+.. toctree::
+   :maxdepth: 1
+
+   api/index
 
 .. comment: list link used in the file above
 .. _GitHub Repository: https://github.com/ChadLin9596/ScenePoint-ETK
