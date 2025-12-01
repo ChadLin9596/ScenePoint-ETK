@@ -34,28 +34,28 @@ def set_sensor_root(sensor_root=None, overwrite=True):
     Module-level function to initialize and setup the Argoverse2 sensor
     dataset root directory and log id mapping.
 
-    ```
-    <sensor_root>
-        ├── 00a6ffc1-6ce9-3bc3-a060-6006e9893a1a  <- log_id
-        │   ├── annotations.feather
-        │   ├── calibration
-        │   ├── city_SE3_egovehicle.feather
-        │   ├── map
-        │   └── ... (1 more files)
-        ├── 01bb304d-7bd8-35f8-bbef-7086b688e35e
-        ├── 022af476-9937-3e70-be52-f65420d52703
-        └── ...
-    ```
+    Directory structure example::
 
-    Args:
+        <sensor_root>
+            ├── 00a6ffc1-6ce9-3bc3-a060-6006e9893a1a  <- log_id
+            │   ├── annotations.feather
+            │   ├── calibration
+            │   ├── city_SE3_egovehicle.feather
+            │   ├── map
+            │   └── ... (1 more files)
+            ├── 01bb304d-7bd8-35f8-bbef-7086b688e35e
+            ├── 022af476-9937-3e70-be52-f65420d52703
+            └── ...
+
+    Parameters:
+
     - sensor_root (str | None, optional):
         - Root directory of the Argoverse2 dataset.
-        If None, the value from `scene_point_etk/config.json` is used.
+          If None, the value from `scene_point_etk/config.json` is used.
 
-    - overwrite (bool, optional):
+    - overwrite (bool | True, optional):
         - If True, update `scene_point_etk/config.json` with the
-        provided sensor_root.
-
+          provided sensor_root.
     """
 
     global _SENSOR_ROOT, _SENSOR_MAP
@@ -98,17 +98,24 @@ def check_log_id(log_id):
     """
     Check if the log id can be located by this module.
 
-    for example:
-    ```python
-    >> import scene_point_etk.argoverse2 as av2
-    >> # the log id without '-'
-    >> log_id = "00a6ffc16ce93bc3a0606006e9893a1a"
-    >> av2.set_sensor_root(sensor_root="a correct directory")
-    >> av2.check_log_id(log_id) # no error
-    >> av2.set_sensor_root(sensor_root="an incorrect directory")
-    >> av2.check_log_id(log_id)
-    ValueError: Log id 00a6ffc16ce93bc3a0606006e9893a1a not found
-    ```
+    For Example::
+
+        >> import scene_point_etk.argoverse2 as av2
+
+        # the log id without '-'
+        >> log_id = "00a6ffc16ce93bc3a0606006e9893a1a"
+
+        >> av2.set_sensor_root(sensor_root="a correct directory")
+        >> av2.check_log_id(log_id) # no error
+
+        >> av2.set_sensor_root(sensor_root="an incorrect directory")
+        >> av2.check_log_id(log_id)
+        "ValueError: Log id 00a6ffc16ce93bc3a0606006e9893a1a not found"
+
+        >> log_id = "non_existing_log_id"
+        >> av2.set_sensor_root(sensor_root="a correct directory")
+        >> av2.check_log_id(log_id)
+        "ValueError: Log id non_existing_log_id not found"
     """
     if log_id not in _SENSOR_MAP:
         raise ValueError(f"Log id {log_id} not found")

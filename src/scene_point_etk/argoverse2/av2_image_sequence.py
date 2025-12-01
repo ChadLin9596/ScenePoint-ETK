@@ -118,6 +118,7 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
             self._figsize = state["figsize"]
 
     def get_an_image(self, index):
+        """get an image as a HxWx3 numpy array by an integer index."""
 
         img = plt.imread(self._files[index])
         if self.is_reshaped:
@@ -129,6 +130,7 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
 
     @property
     def figsize(self):
+        """Return the figure size as (height, width)."""
 
         if hasattr(self, "_figsize"):
             return self._figsize
@@ -142,6 +144,7 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
 
     @property
     def intrinsic(self):
+        """Return the intrinsic matrix as a 3x3 numpy array."""
 
         if hasattr(self, "_intrinsic"):
             return self._intrinsic
@@ -192,6 +195,7 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
 
     @property
     def extrinsic(self):
+        """Return the extrinsic matrices as a Nx4x4 numpy array."""
 
         if hasattr(self, "_extrinsic"):
             return self._extrinsic
@@ -266,6 +270,7 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         return result
 
     def resize(self, H, W):
+        """Return a resized copy of the image sequence with new height H and width W."""
 
         other = copy.copy(self)
 
@@ -287,6 +292,36 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         max_distance=np.inf,
         return_details=False,
     ):
+        """
+        Get a depth map as a HxW numpy array by an integer index and 3D points.
+
+        Args:
+
+        - index (int):
+            - index of the image in the sequence.
+
+        - points (np.ndarray):
+            - Nx3 array of 3D points in world coordinates.
+
+        - invalid_value (float | nan):
+            - value to assign to pixels where no points project.
+
+        - min_distance (float):
+            - minimum distance from the camera to consider a point valid.
+
+        - max_distance (float):
+            - maximum distance from the camera to consider a point valid.
+
+        - return_details (bool):
+            - whether to return additional details as a dictionary.
+
+        Returns:
+
+        - depth_map (np.ndarray):
+            - HxW array representing the depth map.
+        - details (dict, optional):
+            - additional details if return_details is True.
+        """
 
         extrinsic = self.extrinsic[index]
         intrinsic = self.intrinsic
@@ -531,6 +566,10 @@ class CameraSequence(ArgoMixin, array_data.Array):
         return other
 
     def align_timestamps(self, timestamps):
+        """
+        Return a copy of the CameraSequence with cameras aligned to the
+        given timestamps.
+        """
         cameras = []
         for camera in self.cameras:
             camera = camera.align_timestamps(timestamps)
