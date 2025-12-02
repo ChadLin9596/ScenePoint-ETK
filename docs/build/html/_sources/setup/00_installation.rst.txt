@@ -13,6 +13,14 @@ Prepare Python Environment
     $ conda activate <your env name>
     (your env)$
 
+Install **scene_point_etk** in your workspace
+---------------------------------------------
+
+.. code-block:: bash
+
+    # clone main repo
+    (your env)$ git clone https://github.com/ChadLin9596/ScenePoint-ETK
+    (your env)$ pip install -e ./ScenePoint-ETK
 
 (Optional) Install **py_utils** in your workspace
 -------------------------------------------------
@@ -25,15 +33,6 @@ you can manually install it in your workspace:
 
     (your env)$ git clone https://github.com/ChadLin9596/python_utils
     (your env)$ pip install -e ./python_utils
-
-Install **scene_point_etk** in your workspace
----------------------------------------------
-
-.. code-block:: bash
-
-    # clone main repo
-    (your env)$ git clone https://github.com/ChadLin9596/ScenePoint-ETK
-    (your env)$ pip install -e ./ScenePoint-ETK
 
 (Optional) Install **pptk** from my modified wheel release
 ----------------------------------------------------------
