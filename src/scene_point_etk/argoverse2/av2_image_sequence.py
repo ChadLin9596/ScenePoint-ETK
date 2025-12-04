@@ -1,6 +1,8 @@
 import copy
 import glob
+import hashlib
 import os
+import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -203,6 +205,14 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         extrinsic = self.transformation @ self.extrinsic_to_ego[None, ...]
         self._extrinsic = extrinsic
         return self._extrinsic
+
+    @property
+    def unique_id(self):
+        """Return a unique ID for the image sequence."""
+        uid = pickle.dumps(self)
+        uid = hashlib.sha256(uid).hexdigest()
+        uid = uid[:16]
+        return uid
 
     def filter_by_image_viewing(
         self,
@@ -490,27 +500,53 @@ class CameraSequence(ArgoMixin, array_data.Array):
     def list_cameras(self):
         return [i.camera for i in self.cameras]
 
-    def get_a_camera(self, index_or_camera_name):
+    def list_camera_unique_ids(self):
+        return [i.unique_id for i in self.cameras]
 
-        if isinstance(index_or_camera_name, int):
-            return self.cameras[index_or_camera_name]
+    def list_image_sequences(self):
+        return self.cameras.copy()
+
+    def get_a_camera(self, index_or_unique_id_or_camera_name):
+
+        if isinstance(index_or_unique_id_or_camera_name, int):
+            return self.cameras[index_or_unique_id_or_camera_name]
 
         for camera in self.cameras:
-            if camera.camera == index_or_camera_name:
+            if camera.camera == index_or_unique_id_or_camera_name:
+                return camera
+            if camera.unique_id == index_or_unique_id_or_camera_name:
                 return camera
 
-        raise ValueError(f"Camera {index_or_camera_name} not found")
+        msg = f"Camera {index_or_unique_id_or_camera_name} not found"
+        raise ValueError(msg)
 
     def set_a_camera(self, camera):
         if not isinstance(camera, ImageSequence):
             raise ValueError("camera must be an ImageSequence")
 
         for i in range(len(self.cameras)):
-            if self.cameras[i].camera == camera.camera:
+            if self.cameras[i].unique_id == camera.unique_id:
                 self.cameras[i] = camera
                 return
 
-        raise ValueError(f"Camera {camera.camera} not found")
+        msg = f"Camera {camera.camera}, {camera.unique_id} not found"
+        raise ValueError(msg)
+
+    def append_a_camera(self, camera):
+        if not isinstance(camera, ImageSequence):
+            raise ValueError("camera must be an ImageSequence")
+
+        self.cameras.append(camera)
+
+        # previously stored index
+        index = self.index
+
+        # re-allocate with new length
+        self._allocate(len(self.cameras))
+
+        # restore previous index and add new one
+        self._data.loc[: len(index) - 1, "index"] = index
+        self._data.loc[len(index), "index"] = np.max(index) + 1
 
     def filter_by_image_viewing(
         self,
@@ -569,6 +605,8 @@ class CameraSequence(ArgoMixin, array_data.Array):
         """
         Return a copy of the CameraSequence with cameras aligned to the
         given timestamps.
+
+        TODO: consider case that lengths of timestamps are different.
         """
         cameras = []
         for camera in self.cameras:
