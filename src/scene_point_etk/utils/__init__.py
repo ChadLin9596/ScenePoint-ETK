@@ -72,14 +72,6 @@ def decode_rgba(bgra):
     r = bgra[:, 2]
     a = bgra[:, 3]
 
-    if np.all(r <= 255) and np.all(g <= 255) and np.all(b <= 255):
-        r = r / 255.0
-        g = g / 255.0
-        b = b / 255.0
-
-    if np.all(a <= 255):
-        a = a / 255.0
-
     return r, g, b, a
 
 
