@@ -41,9 +41,11 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         timestamps = [os.path.basename(i) for i in files]
         timestamps = [int(i.replace(".jpg", "")) for i in timestamps]
 
+        # member variables for ImageSequence
         self._path = root
         self.camera = camera
         self._files = files
+        self._transforms = []
 
         # initialize the array_data.TimePoseSequence
         n = len(files)
@@ -56,10 +58,27 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         I = np.searchsorted(T, timestamps)
         assert np.all(T[I] == timestamps)
 
+        # member variables for array_data.TimePoseSequence
         self.timestamps = timestamps
         self.xyz = poses["xyz"][I]
         self.quaternion = poses["q"][I]
-        self.is_reshaped = False
+        # self.is_reshaped = False
+
+    def __reprtransforms__(self):
+        msg = ""
+        for transform, params in self._transforms:
+
+            if transform == "resize":
+                msg += f"\n\tresized to {params['H']}x{params['W']}"
+
+            elif transform == "crop":
+                msg += f"\n\tcropped to {params['height']}x{params['width']}"
+                msg += f" from top {params['top']} left {params['left']}"
+
+            else:
+                raise ValueError(f"Unknown transform {transform}")
+
+        return msg
 
     def __repr__(self):
         N = len(self._data)
@@ -67,14 +86,20 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         msg = f"<ImageSequences contains {N} {H}x{W} images>"
         msg += f" ({self.camera})"
 
+        # explicitly show transforms if any
+        msg += self.__reprtransforms__()
+
         return msg
 
     def __getitem__(self, key):
 
+        #  `index`, `timestamps`, `xyz,` `quaternion`
         other = super().__getitem__(key)
+
         other._path = self._path
         other.camera = self.camera
         other._files = np.array(self._files)[key].tolist()
+        other._transforms = self._transforms.copy()
 
         return other
 
@@ -84,12 +109,9 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
             "log_id": self.log_id,
             "camera": self.camera,
             "filenames": [os.path.basename(i) for i in self._files],
-            "is_reshaped": self.is_reshaped,
+            "transforms": self._transforms,
         }
         state.update(super().__getstate__())
-
-        if self.is_reshaped:
-            state["figsize"] = self.figsize
 
         return state
 
@@ -98,7 +120,7 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         log_id = state["log_id"]
         camera = state["camera"]
         filenames = state["filenames"]
-        is_reshaped = state.get("is_reshaped", False)
+        transforms = state.get("transforms", [])
 
         check_log_id(log_id)
 
@@ -108,25 +130,35 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         fs = []
         for i in filenames:
             f = os.path.join(path, "sensors", "cameras", camera, i)
+            if not os.path.exists(f):
+                raise FileNotFoundError(f"File {f} not found")
             fs.append(f)
 
         self._path = path
         self.camera = camera
         self._files = fs
-        self.is_reshaped = is_reshaped
-
-        if is_reshaped:
-            self.is_reshaped = state["is_reshaped"]
-            self._figsize = state["figsize"]
+        self._transforms = transforms
 
     def get_an_image(self, index):
         """get an image as a HxWx3 numpy array by an integer index."""
 
         img = plt.imread(self._files[index])
-        if self.is_reshaped:
-            H, W = self.figsize
-            img = Image.fromarray(img).resize((W, H), Image.Resampling.BICUBIC)
-            img = np.array(img)
+
+        for transform, params in self._transforms:
+
+            if transform == "resize":
+                H = params["H"]
+                W = params["W"]
+                mode = Image.Resampling.BICUBIC
+                img = Image.fromarray(img).resize((W, H), mode)
+                img = np.array(img)
+
+            elif transform == "crop":
+                top = params["top"]
+                left = params["left"]
+                height = params["height"]
+                width = params["width"]
+                img = img[top : top + height, left : left + width, :]
 
         return img
 
@@ -140,6 +172,24 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         X = get_intrinsic_by_log_id(self.log_id)
         index = np.searchsorted(X["sensor_name"].to_numpy(), self.camera)
         figsize = X[["height_px", "width_px"]].to_numpy()[index]
+
+        if len(self._transforms) == 0:
+            self._figsize = figsize
+            return self._figsize
+
+        method, params = self._transforms[-1]
+        if method == "resize":
+            H = params["H"]
+            W = params["W"]
+            figsize = np.r_[H, W]
+
+        elif method == "crop":
+            height = params["height"]
+            width = params["width"]
+            figsize = np.r_[height, width]
+
+        else:
+            raise ValueError(f"Unknown transform {method}")
 
         self._figsize = figsize
         return self._figsize
@@ -155,6 +205,7 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         index = np.searchsorted(X["sensor_name"].to_numpy(), self.camera)
         focal_length = X[["fx_px", "fy_px"]].to_numpy()[index]
         principal_point = X[["cx_px", "cy_px"]].to_numpy()[index]
+        figsize = X[["height_px", "width_px"]].to_numpy()[index]
 
         # fmt: off
         self._intrinsic = np.array([
@@ -164,15 +215,35 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         ])
         # fmt: on
 
-        if self.is_reshaped:
+        if len(self._transforms) == 0:
+            return self._intrinsic
 
-            original_figsize = X[["height_px", "width_px"]].to_numpy()[index]
+        for method, params in self._transforms:
 
-            self._intrinsic = utils_img.update_intrinsics_by_resized(
-                self._intrinsic,
-                original_figsize,
-                self._figsize,  # should already be set
-            )
+            if method == "resize":
+                H = params["H"]
+                W = params["W"]
+
+                self._intrinsic = utils_img.update_intrinsics_by_resized(
+                    self._intrinsic,
+                    figsize,
+                    (H, W),
+                )
+                figsize = (H, W)
+
+            elif method == "crop":
+                top = params["top"]
+                left = params["left"]
+
+                self._intrinsic = utils_img.update_intrinsics_by_crop(
+                    self._intrinsic,
+                    top,
+                    left,
+                )
+                figsize = (params["height"], params["width"])
+
+            else:
+                raise ValueError(f"Unknown transform {method}")
 
         return self._intrinsic
 
@@ -282,16 +353,46 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
     def resize(self, H, W):
         """Return a resized copy of the image sequence with new height H and width W."""
 
-        other = copy.copy(self)
+        H, W = int(H), int(W)
 
-        other._figsize = np.r_[H, W]
-        other.is_reshaped = True
-        other._intrinsic = utils_img.update_intrinsics_by_resized(
-            self.intrinsic,
-            self.figsize,
-            (H, W),
-        )
+        other = copy.copy(self)
+        other._transforms = []
+        other._transforms.extend(self._transforms)
+        other._transforms.append(("resize", {"H": H, "W": W}))
+
         return other
+
+    def crop(self, top, left, height, width):
+        """Return a cropped copy of the image sequence."""
+
+        top = int(top)
+        left = int(left)
+        height = int(height)
+        width = int(width)
+
+        other = copy.copy(self)
+        other._transforms = []
+        other._transforms.extend(self._transforms)
+        other._transforms.append(
+            (
+                "crop",
+                {"top": top, "left": left, "height": height, "width": width},
+            ),
+        )
+
+        return other
+
+    def center_crop(self, crop_height, crop_width):
+        """Return a center-cropped copy of the image sequence."""
+
+        crop_height = int(crop_height)
+        crop_width = int(crop_width)
+
+        H, W = self.figsize
+        top = (H - crop_height) // 2
+        left = (W - crop_width) // 2
+
+        return self.crop(top, left, crop_height, crop_width)
 
     def get_a_depth_map(
         self,
@@ -595,6 +696,26 @@ class CameraSequence(ArgoMixin, array_data.Array):
         cameras = []
         for camera in self.cameras:
             camera = camera.resize(H, W)
+            cameras.append(camera)
+
+        other = copy.copy(self)
+        other.cameras = cameras
+        return other
+
+    def crop(self, top, left, height, width):
+        cameras = []
+        for camera in self.cameras:
+            camera = camera.crop(top, left, height, width)
+            cameras.append(camera)
+
+        other = copy.copy(self)
+        other.cameras = cameras
+        return other
+
+    def center_crop(self, crop_height, crop_width):
+        cameras = []
+        for camera in self.cameras:
+            camera = camera.center_crop(crop_height, crop_width)
             cameras.append(camera)
 
         other = copy.copy(self)
