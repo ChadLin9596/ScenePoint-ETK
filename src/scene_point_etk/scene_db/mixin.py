@@ -56,6 +56,12 @@ class ScenePCDMixin:
         self._scene_pcd = pcd_data.copy()
 
     @property
+    def scene_pcd_bytesize(self):
+        if os.path.exists(self.scene_filepath):
+            return os.path.getsize(self.scene_filepath)
+        return 0
+
+    @property
     def pcd_xyz(self):
         p = self.scene_pcd
         xyz = np.vstack([p["x"], p["y"], p["z"]]).T
@@ -118,6 +124,15 @@ class SceneDetailsMixin:
         with open(self.details_filepath, "wb") as fd:
             pickle.dump(details, fd)
 
+    @property
+    def scene_details_bytesize(self):
+        """
+        num of bytes of `details.pkl`. 0 if the file does not exist.
+        """
+        if os.path.exists(self.details_filepath):
+            return os.path.getsize(self.details_filepath)
+        return 0
+
 
 class CameraSequenceMixin:
     """
@@ -172,6 +187,15 @@ class CameraSequenceMixin:
         self._camera_sequence = camera_sequence
         with open(self.camera_seq_filepath, "wb") as f:
             pickle.dump(camera_sequence, f)
+
+    @property
+    def camera_sequence_bytesize(self):
+        """
+        num of bytes of `cam_sequence.pkl`. 0 if the file does not exist.
+        """
+        if os.path.exists(self.camera_seq_filepath):
+            return os.path.getsize(self.camera_seq_filepath)
+        return 0
 
     @property
     def cameras(self):

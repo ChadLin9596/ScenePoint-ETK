@@ -59,17 +59,11 @@ class Base(ScenePCDMixin, SceneDetailsMixin, CameraSequenceMixin):
     @property
     def bytesize(self):
         R = {
-            "scene.pcd": 0,
-            "details.pkl": 0,
-            "cam_sequence.pkl": 0,
+            "scene.pcd": self.scene_pcd_bytesize,
+            "details.pkl": self.scene_details_bytesize,
+            "cam_sequence.pkl": self.camera_sequence_bytesize,
             "cameras": {},
         }
-        if os.path.exists(self.scene_filepath):
-            R["scene.pcd"] = os.path.getsize(self.scene_filepath)
-        if os.path.exists(self.details_filepath):
-            R["details.pkl"] = os.path.getsize(self.details_filepath)
-        if os.path.exists(self.camera_seq_filepath):
-            R["cam_sequence.pkl"] = os.path.getsize(self.camera_seq_filepath)
 
         for camera in self.cameras:
             camera_path = os.path.join(self.cameras_root, camera)
