@@ -1,5 +1,6 @@
 import os
 import glob
+import hashlib
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,17 +19,19 @@ import py_utils.utils_segmentation as utils_segmentation
 
 class ScenePCDMixin:
     """
-    a mixin class for scene PCD data.
+    a mixin class for scene PCD data. To use this mixin, the child class
+    must define the `scene_filepath` attribute pointing to the location
+    of the `scene.pcd` file.
 
-    ```
-    <root>
-    ├── <Scene ID 00>
-    │   └── <version name>
-    │       └── scene.pcd  <- scene_filepath
-    │
-    ├── <Scene ID 01>
-    └── ...
-    ```
+    directory structure::
+
+        <root>
+        ├── <Scene ID 00>
+        │   └── <version name>
+        │       └── scene.pcd  <- scene_filepath
+        │
+        ├── <Scene ID 01>
+        └── ...
     """
 
     scene_filepath = ""
@@ -86,22 +89,22 @@ class ScenePCDMixin:
     def pcd_color(self):
         p = self.scene_pcd
         r, g, b, a = scene_utils.decode_rgba(p["rgb"])
-        return np.vstack([r, g, b]).T
+        return np.vstack([r, g, b, a]).T
 
 
 class SceneDetailsMixin:
     """
     a mixin class for scene details data.
 
-    ```
-    <root>
-    ├── <Scene ID 00>
-    │   └── <version name>
-    │       └── details.pkl  <- details_filepath
-    │
-    ├── <Scene ID 01>
-    └── ...
-    ```
+    directory structure::
+
+        <root>
+        ├── <Scene ID 00>
+        │   └── <version name>
+        │       └── details.pkl  <- details_filepath
+        │
+        ├── <Scene ID 01>
+        └── ...
     """
 
     details_filepath = ""
@@ -138,24 +141,24 @@ class CameraSequenceMixin:
     """
     a mixin class for camera sequence data.
 
-    ```
-    <root>
-    ├── <Scene ID 00>
-    │   │
-    │   └── <version name>
-    │       └── cameras  <- cameras_root
-    │           ├── cam_sequence.pkl (optional)  <- camera_seq_filepath
-    │           ├── <camera name 1>
-    │           │   └── sparse_point_indices
-    │           │       ├── <point indices 1>.npy
-    │           │       └── ...
-    │           │
-    │           ├── <camera name 2>
-    │           └── ...
-    │
-    ├── <Scene ID 01>
-    └── ...
-    ```
+    directory structure::
+
+        <root>
+        ├── <Scene ID 00>
+        │   │
+        │   └── <version name>
+        │       └── cameras  <- cameras_root
+        │           ├── cam_sequence.pkl (optional)  <- camera_seq_filepath
+        │           ├── <camera name 1>
+        │           │   └── sparse_point_indices
+        │           │       ├── <point indices 1>.npy
+        │           │       └── ...
+        │           │
+        │           ├── <camera name 2>
+        │           └── ...
+        │
+        ├── <Scene ID 01>
+        └── ...
     """
 
     # separate `cameras_root` and `camera_seq_filepath` to allow
@@ -201,279 +204,99 @@ class CameraSequenceMixin:
     def cameras(self):
         return self.camera_sequence.list_cameras()
 
-    def get_camera_filenames(self, camera_name):
-        files = self.camera_sequence.get_a_camera(camera_name)._files
-        files = [os.path.basename(i) for i in files]
-        return files
+    @property
+    def camera_unique_ids(self):
+        return self.camera_sequence.list_camera_unique_ids()
 
-    def _initialize_cam_fnames(self, camera_name, filename_or_index):
+    ##########
+    # Getter #
+    ##########
 
-        if isinstance(filename_or_index, int):
-            ind = filename_or_index
-            filename_or_index = self.get_camera_filenames(camera_name)[ind]
+    def get_an_image_filename(self, index_or_unique_id_or_camera_name, index):
 
-        assert isinstance(filename_or_index, str)
-        filename = filename_or_index.replace(".npy", "")
-        filename = filename.replace(".png", "")
-        filename = filename.replace(".jpg", "")
-        return filename
+        arg = index_or_unique_id_or_camera_name
+        file = self.camera_sequence.get_a_camera(arg)._files[index]
+        file = os.path.basename(file)
+        file = ".".join(file.split(".")[:-1])
+        return file
 
-    def get_an_image(self, camera_name, index):
+    def get_an_image(self, index_or_unique_id_or_camera_name, index):
 
-        img_seq = self.camera_sequence.get_a_camera(camera_name)
+        arg = index_or_unique_id_or_camera_name
+        img_seq = self.camera_sequence.get_a_camera(arg)
         return img_seq.get_an_image(index)
 
-    def _point_indices_on_an_image(
+    def get_a_point_index_map(
         self,
-        camera_name,
+        index_or_unique_id_or_camera_name,
         index,
-        xyz,
-        min_distance=0.0,
-        max_distance=np.inf,
+        points,
     ):
 
-        img_seq = self.camera_sequence.get_a_camera(camera_name)
-        intrinsic = img_seq.intrinsic
-        extrinsic = img_seq.extrinsic[index]
-        H, W = img_seq.figsize
+        arg = index_or_unique_id_or_camera_name
 
-        args = (xyz, intrinsic, extrinsic, H, W)
-        kwargs = {"min_distance": min_distance, "max_distance": max_distance}
-        index_map = utils_img.points_to_index_map(*args, **kwargs)
-        return index_map
+        cache_file_path = os.path.join(
+            self.cameras_root,
+            self.camera_sequence.get_a_camera(arg).unique_id,
+            hashlib.sha256(points.tobytes()).hexdigest()[:16],
+            self.get_an_image_filename(arg, index) + ".npy",
+        )
 
-    def point_indices_on_an_image(
-        self,
-        camera_name,
-        index,
-        xyz,
-        min_distance=0.0,
-        max_distance=np.inf,
-        overwrite=False,
-    ):
-
-        root = self.cameras_root
-        root = os.path.join(root, camera_name, "sparse_point_indices")
-        os.makedirs(root, exist_ok=True)
-
-        filename = self.get_camera_filenames(camera_name)[index]
-        filename = filename.replace(".npy", "")
-        filename = filename.replace(".png", "")
-        filename = filename.replace(".jpg", "")
-        filename = os.path.join(root, filename + ".npy")
-
-        if os.path.exists(filename) and not overwrite:
-            index_map = np.load(filename)
+        if os.path.exists(cache_file_path):
+            index_map = np.load(cache_file_path)
             return index_map
 
-        args = (camera_name, index, xyz)
-        kwargs = {"min_distance": min_distance, "max_distance": max_distance}
-        index_map = self._point_indices_on_an_image(*args, **kwargs)
+        os.makedirs(os.path.dirname(cache_file_path), exist_ok=True)
 
-        if overwrite:
-            np.save(filename, index_map)
+        kwargs = {
+            "index": index,
+            "points": points,
+            # hard code following params for constant caching
+            "invalid_value": np.nan,
+            "min_distance": 0,
+            "max_distance": np.inf,
+        }
 
+        img_seq = self.camera_sequence.get_a_camera(arg)
+        index_map = img_seq.get_a_point_index_map(**kwargs)
+
+        np.save(cache_file_path, index_map)
         return index_map
 
-    def point_on_an_image(
+    def get_a_point_map(
         self,
-        camera_name,
+        index_or_unique_id_or_camera_name,
         index,
-        xyz,
-        min_distance=0.0,
-        max_distance=np.inf,
+        points,
     ):
+        arg = index_or_unique_id_or_camera_name
+        index_map = self.get_a_point_index_map(arg, index, points)
 
-        img_seq = self.camera_sequence.get_a_camera(camera_name)
-        intrinsic = img_seq.intrinsic
-        extrinsic = img_seq.extrinsic[index]
-        H, W = img_seq.figsize
-
-        args = (xyz, intrinsic, extrinsic, H, W)
-        kwargs = {
-            "min_distance": min_distance,
-            "max_distance": max_distance,
-            "invalid_value": np.nan,
-        }
-        point_map = utils_img.points_to_point_map(*args, **kwargs)
+        point_map = np.full(index_map.shape + (3,), np.nan, dtype=np.float32)
+        valid_map = index_map >= 0
+        point_map[valid_map] = points[index_map[valid_map]]
         return point_map
 
-    def depth_on_an_image(
+    def get_a_depth_map(
         self,
-        camera_name,
+        index_or_unique_id_or_camera_name,
         index,
-        xyz,
-        min_distance=0.0,
-        max_distance=np.inf,
+        points,
     ):
+        arg = index_or_unique_id_or_camera_name
+        point_map = self.get_a_point_map(arg, index, points)
 
-        img_seq = self.camera_sequence.get_a_camera(camera_name)
-        extrinsic = img_seq.extrinsic[index]
-
-        kwargs = {"min_distance": min_distance, "max_distance": max_distance}
-        point_map = self.point_on_an_image(camera_name, index, xyz, **kwargs)
-
-        depth = np.full(point_map.shape[:2], np.nan, dtype=np.float32)
+        img_seq = self.camera_sequence.get_a_camera(arg)
         valid_map = ~np.isnan(point_map).any(axis=-1)
 
-        xyz = point_map[valid_map]
-        xyz = utils_img._trans_from_world_to_camera(xyz, extrinsic)
+        xyz = utils_img._trans_from_world_to_camera(
+            point_map[valid_map].reshape(-1, 3),
+            img_seq.extrinsic[index],
+        )
+
+        depth = np.full(point_map.shape[:2], np.nan, dtype=np.float32)
         depth[valid_map] = xyz[:, 2]
-
         return depth
-
-    @property
-    def camera_point_indices_map(self):
-
-        if hasattr(self, "_camera_point_indices_map"):
-            return self._camera_point_indices_map.copy()
-
-        point_indices = {}
-
-        for camera in self.cameras:
-
-            root = self.cameras_root
-            root = os.path.join(
-                self.cameras_root, camera, "sparse_point_indices"
-            )
-            point_indices_root = os.path.join(root, "sparse_point_indices")
-            os.makedirs(point_indices_root, exist_ok=True)
-
-            img_seq = self.camera_sequence.get_a_camera(camera)
-            intrinsic = img_seq.intrinsic
-            extrinsics = img_seq.extrinsic
-            xyz = self.pcd_xyz
-            H, W = img_seq.figsize
-
-            indices_maps = []
-            for idx, extrinsic in enumerate(extrinsics):
-
-                name = self._initialize_cam_fnames(camera, idx) + ".npy"
-                path = os.path.join(point_indices_root, name)
-                # if os.path.exists(path):
-                #     index_map = np.load(path)
-                #     indices_maps.append(index_map)
-                #     continue
-
-                args = (xyz, intrinsic, extrinsic, H, W)
-                kwargs = {"min_distance": 0.0, "max_distance": np.inf}
-                index_map = utils_img.points_to_index_map(*args, **kwargs)
-                indices_maps.append(index_map)
-                np.save(path, index_map)
-
-            indices_maps = np.array(indices_maps)
-            point_indices[camera] = indices_maps
-
-        self._camera_point_indices_map = point_indices
-        return self._camera_point_indices_map.copy()
-
-    @property
-    def camera_point_map(self):
-
-        if hasattr(self, "_camera_point_map"):
-            return self._camera_point_map.copy()
-
-        point_maps = {}
-
-        for camera in self.cameras:
-            indices_maps = self.camera_point_indices_map[camera]
-            xyz = self.pcd_xyz
-
-            shape = indices_maps.shape + (3,)
-            valid_map = indices_maps != -1
-            point_map = np.full(shape, np.nan, dtype=np.float32)
-            point_map[valid_map] = xyz[indices_maps[valid_map]]
-            point_maps[camera] = point_map
-
-        self._camera_point_map = point_maps
-        return self._camera_point_map.copy()
-
-    @property
-    def camera_depth_map(self):
-
-        if hasattr(self, "_camera_depth_map"):
-            return self._camera_depth_map.copy()
-
-        depth_maps = {}
-
-        for camera in self.cameras:
-
-            img_seq = self.camera_sequence.get_a_camera(camera)
-
-            extrinsics = img_seq.extrinsic  # (N, 4, 4)
-            point_map = self.camera_point_map[camera]
-
-            depth_map = []
-            for extrinsic, point in zip(extrinsics, point_map):
-
-                depth = np.full(point.shape[:2], np.nan, dtype=np.float32)
-                valid_map = ~np.isnan(point).any(axis=-1)
-
-                if not np.any(valid_map):
-                    depth_map.append(depth)
-                    continue
-
-                xyz = point[valid_map]
-                xyz = utils_img._trans_from_world_to_camera(xyz, extrinsic)
-                depth[valid_map] = xyz[:, 2]
-                depth_map.append(depth)
-
-            depth_map = np.array(depth_map)
-            depth_maps[camera] = depth_map
-
-        self._camera_depth_map = depth_maps
-        return self._camera_depth_map.copy()
-
-    def _chunkify(self, camera_name, chunk_size=50, with_overlap=True):
-
-        img_seq = self.camera_sequence.get_a_camera(camera_name)
-        segments = []
-
-        if with_overlap:
-
-            f = utils_segmentation.compute_sliding_window_indices_with_overlap
-            s_inds, e_inds = f(len(img_seq), chunk_size, overlap_ratio=0.3)
-
-            for s, e in zip(s_inds, e_inds):
-                segment = np.arange(s, e)
-                segments.append(segment)
-
-            # indices = np.arange(len(img_seq))
-            # segments.extend(segment_with_overlap_full(indices, chunk_size))
-
-        else:
-            indices = np.arange(0, len(img_seq), chunk_size)
-            indices = np.r_[indices, len(img_seq)]
-
-            for start, end in zip(indices[:-1], indices[1:]):
-                segment = np.arange(start, end)
-                segments.append(segment)
-
-        return segments
-
-    def chunkify_images(self, camera_name, chunk_size=50, with_overlap=True):
-
-        segments = self._chunkify(camera_name, chunk_size, with_overlap)
-
-        for segment in segments:
-
-            segment_images = []
-            for idx in segment:
-                image = self.get_an_image(camera_name, idx)
-                segment_images.append(image)
-
-            yield np.array(segment_images)
-
-    def chunkify_point_map(
-        self, camera_name, chunk_size=50, with_overlap=True
-    ):
-
-        point_map = self.camera_point_map[camera_name]
-        segments = self._chunkify(camera_name, chunk_size, with_overlap)
-
-        for segment in segments:
-            segment_points = point_map[segment]
-            yield segment_points
 
 
 class EditedDetailsMixin:

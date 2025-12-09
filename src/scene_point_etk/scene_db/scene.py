@@ -201,6 +201,7 @@ class EditedScene(Base, EditedDetailsMixin):
 
         # reuse the camera sequence from the GT scene
         p = os.path.join(self.root, "GT", "cameras", "cam_sequence.pkl")
+        self.cameras_root = os.path.join(self.root, "GT", "cameras")
         self.camera_seq_filepath = os.path.join(p)
 
     @property
