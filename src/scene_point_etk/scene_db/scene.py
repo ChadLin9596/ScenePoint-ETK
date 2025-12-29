@@ -204,12 +204,13 @@ class EditedScene(Base, EditedDetailsMixin):
         self.cameras_root = os.path.join(self.root, "GT", "cameras")
         self.camera_seq_filepath = os.path.join(p)
 
+        self._origin_scene = OriginalScene(self.root)
+
     @property
     def edited_details(self):
 
-        scene = OriginalScene(self.root)
         _, details = diff_scene.apply_change_info_to_target_pcd(
-            scene.scene_pcd,
+            self._origin_scene.scene_pcd,
             self.scene_details,
             return_details=True,
         )
@@ -226,9 +227,8 @@ class EditedScene(Base, EditedDetailsMixin):
         if os.path.exists(self.scene_filepath):
             return super().scene_pcd
 
-        original_scene = OriginalScene(self.root)
         scene = diff_scene.apply_change_info_to_target_pcd(
-            original_scene.scene_pcd,
+            self._origin_scene.scene_pcd,
             self.scene_details,
         )
         pcd.write(self.scene_filepath, scene)
@@ -251,17 +251,17 @@ class EditedScene(Base, EditedDetailsMixin):
         if hasattr(self, "_deleted_lidar_sweeps"):
             return self._deleted_lidar_sweeps
 
-        orig_scene = OriginalScene(self.root)
-        lidar_sweeps = orig_scene.cleaned_lidar_sweeps
+        lidar_sweeps = self._origin_scene.cleaned_lidar_sweeps
 
         if len(self.edited_details["deleted_indices_of_target"]) == 0:
             # no deleted points
             self._deleted_lidar_sweeps = [i - i for i in lidar_sweeps]
             return self._deleted_lidar_sweeps
 
+        voxel_size = self._origin_scene.scene_details.get("voxel_size", 0.2)
         sweeps = argoverse2.SweepSequence.from_sweeps(lidar_sweeps)
         _, details = sweeps.export_to_voxel_grid(
-            voxel_size=orig_scene.scene_details.get("voxel_size", 0.2),
+            voxel_size=voxel_size,
             skip_color=True,
             return_details=True,
         )
@@ -297,6 +297,79 @@ class EditedScene(Base, EditedDetailsMixin):
     def added_lidar_sweeps(self):
         # how to form scan points on new inserted objects?
         raise NotImplementedError
+
+    def get_a_change_map(
+        self,
+        index_or_unique_id_or_camera_name,
+        index,
+        # change map parameters
+        neighborhood_size=7,
+        num_valid_points=3,
+        depth_threshold=0.1,
+        return_details=False,
+        # develop
+        other_camera_sequences=None,
+    ):
+
+        img_seq = self._origin_scene.camera_sequence.get_a_camera(
+            index_or_unique_id_or_camera_name
+        )
+        if other_camera_sequences is not None:
+            img_seq = other_camera_sequences.get_a_camera(
+                index_or_unique_id_or_camera_name
+            )
+
+        raw_sweeps = self._origin_scene.raw_lidar_sweeps
+        raw_sweeps = argoverse2.SweepSequence.from_sweeps(raw_sweeps)
+        raw_sweeps = raw_sweeps.align_timestamps(img_seq.timestamps[index])
+
+        assert len(raw_sweeps) == 1
+
+        args = (
+            index_or_unique_id_or_camera_name,
+            index,
+            self._origin_scene.pcd_xyz,
+        )
+        kwargs = {"other_camera_sequences": other_camera_sequences}
+        scene_index_map = self.get_a_point_index_map(*args, **kwargs)
+        scene_depth_map = self.get_a_depth_map(*args, **kwargs)
+
+        lidar_depth_map = img_seq.get_a_depth_map(
+            index,
+            raw_sweeps.xyz,
+            invalid_value=np.nan,
+        )
+
+        cd_mask = np.zeros_like(scene_index_map, dtype=bool)
+        details = {}
+
+        for n, indices in enumerate(self.deleted_indices):
+
+            mask_pre = np.isin(scene_index_map, indices)
+            if not np.any(mask_pre):
+                continue
+
+            mask_filtered = scene_utils.filter_visible(
+                scene_depth_map,
+                lidar_depth_map,
+                FOV_mask=mask_pre,
+                neighborhood_size=neighborhood_size,
+                depth_threshold=depth_threshold,
+                num_valid_points=num_valid_points,
+            )
+            mask = utils_img.fill_sparse_boolean_by_convex_hull(mask_filtered)
+            mask = mask > 0
+            cd_mask |= mask
+
+            details[n] = {
+                "deleted_indices": mask_pre,
+                "filtered_indices": mask_filtered,
+                "convex_hull": mask,
+            }
+
+        if return_details:
+            return cd_mask, details
+        return cd_mask
 
     def camera_change_map(
         self,

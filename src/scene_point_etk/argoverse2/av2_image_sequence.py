@@ -62,7 +62,6 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         self.timestamps = timestamps
         self.xyz = poses["xyz"][I]
         self.quaternion = poses["q"][I]
-        # self.is_reshaped = False
 
     def __reprtransforms__(self):
         msg = ""
@@ -280,7 +279,14 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
     @property
     def unique_id(self):
         """Return a unique ID for the image sequence."""
-        uid = pickle.dumps(self)
+
+        cam_info = {
+            "log_id": self.log_id,
+            "camera": self.camera,
+            "transforms": self._transforms,
+        }
+
+        uid = pickle.dumps(cam_info)
         uid = hashlib.sha256(uid).hexdigest()
         uid = uid[:16]
         return uid
@@ -556,7 +562,7 @@ class CameraSequence(ArgoMixin, array_data.Array):
     def __repr__(self):
         msg = "<CameraSequence contains: %d cameras>" % len(self.cameras)
         for i in self.cameras:
-            msg += "\n\t" + str(i)
+            msg += "".join(["\n\t" + i for i in str(i).splitlines()])
         return msg
 
     def __getitem__(self, key):
@@ -625,13 +631,20 @@ class CameraSequence(ArgoMixin, array_data.Array):
         if not isinstance(camera, ImageSequence):
             raise ValueError("camera must be an ImageSequence")
 
-        for i in range(len(self.cameras)):
-            if self.cameras[i].unique_id == camera.unique_id:
-                self.cameras[i] = camera
-                return
+        camera_names = np.r_[[i.camera for i in self.cameras]]
+        I = np.where(camera_names == camera.camera)[0]
 
-        msg = f"Camera {camera.camera}, {camera.unique_id} not found"
-        raise ValueError(msg)
+        if len(I) == 1:
+            self.cameras[I[0]] = camera
+            return
+
+        if len(I) == 0:
+            msg = f"Camera {camera.camera}, {camera.unique_id} not found"
+            raise ValueError(msg)
+
+        if len(I) > 1:
+            msg = f"Multiple cameras found for {camera.camera}"
+            raise ValueError(msg)
 
     def append_a_camera(self, camera):
         if not isinstance(camera, ImageSequence):

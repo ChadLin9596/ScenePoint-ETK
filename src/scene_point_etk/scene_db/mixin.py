@@ -231,14 +231,23 @@ class CameraSequenceMixin:
         index_or_unique_id_or_camera_name,
         index,
         points,
+        other_camera_sequences=None,
     ):
 
         arg = index_or_unique_id_or_camera_name
 
+        cam = self.camera_sequence.get_a_camera(arg).camera
+        uid = self.camera_sequence.get_a_camera(arg).unique_id
+        if other_camera_sequences is not None:
+            cam = other_camera_sequences.get_a_camera(arg).camera
+            uid = other_camera_sequences.get_a_camera(arg).unique_id
+
+        point_uid = hashlib.sha256(points.tobytes()).hexdigest()[:16]
+
         cache_file_path = os.path.join(
             self.cameras_root,
-            self.camera_sequence.get_a_camera(arg).unique_id,
-            hashlib.sha256(points.tobytes()).hexdigest()[:16],
+            f"{cam}.{uid}",
+            point_uid,
             self.get_an_image_filename(arg, index) + ".npy",
         )
 
@@ -258,6 +267,8 @@ class CameraSequenceMixin:
         }
 
         img_seq = self.camera_sequence.get_a_camera(arg)
+        if other_camera_sequences is not None:
+            img_seq = other_camera_sequences.get_a_camera(arg)
         index_map = img_seq.get_a_point_index_map(**kwargs)
 
         np.save(cache_file_path, index_map)
@@ -268,9 +279,15 @@ class CameraSequenceMixin:
         index_or_unique_id_or_camera_name,
         index,
         points,
+        other_camera_sequences=None,
     ):
         arg = index_or_unique_id_or_camera_name
-        index_map = self.get_a_point_index_map(arg, index, points)
+        index_map = self.get_a_point_index_map(
+            arg,
+            index,
+            points,
+            other_camera_sequences=other_camera_sequences,
+        )
 
         point_map = np.full(index_map.shape + (3,), np.nan, dtype=np.float32)
         valid_map = index_map >= 0
@@ -282,11 +299,20 @@ class CameraSequenceMixin:
         index_or_unique_id_or_camera_name,
         index,
         points,
+        other_camera_sequences=None,
     ):
         arg = index_or_unique_id_or_camera_name
-        point_map = self.get_a_point_map(arg, index, points)
+        point_map = self.get_a_point_map(
+            arg,
+            index,
+            points,
+            other_camera_sequences=other_camera_sequences,
+        )
 
         img_seq = self.camera_sequence.get_a_camera(arg)
+        if other_camera_sequences is not None:
+            img_seq = other_camera_sequences.get_a_camera(arg)
+
         valid_map = ~np.isnan(point_map).any(axis=-1)
 
         xyz = utils_img._trans_from_world_to_camera(

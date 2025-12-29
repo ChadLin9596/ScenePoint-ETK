@@ -265,6 +265,7 @@ class SweepSequence(ArgoMixin, array_data.Timestamps):
 
         c = self.__class__
         other = c.__new__(c)
+        other._data = copy.copy(self._data)
         other._path = self._path
         other.sweeps = copy.copy(self.sweeps)
         other.coordinate = self.coordinate
