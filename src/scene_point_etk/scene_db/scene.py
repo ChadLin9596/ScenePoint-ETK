@@ -258,6 +258,7 @@ class EditedScene(Base, EditedDetailsMixin):
             self._deleted_lidar_sweeps = [i - i for i in lidar_sweeps]
             return self._deleted_lidar_sweeps
 
+        # re-voxelized to trace deleted voxels back to raw points
         voxel_size = self._origin_scene.scene_details.get("voxel_size", 0.2)
         sweeps = argoverse2.SweepSequence.from_sweeps(lidar_sweeps)
         _, details = sweeps.export_to_voxel_grid(
@@ -283,13 +284,14 @@ class EditedScene(Base, EditedDetailsMixin):
         # to local indices
         selected = selected - sweep_starts[starts]
 
-        self._deleted_lidar_sweeps = []
+        # initialize with zero points
+        self._deleted_lidar_sweeps = [i[:0] for i in lidar_sweeps]
         for i, j in zip(splits[:-1], splits[1:]):
 
             s = starts[i]
-            sweep = sweeps.sweeps[s]
+            sweep = lidar_sweeps[s]
             deleted_sweep = sweep[selected[i:j]]
-            self._deleted_lidar_sweeps.append(deleted_sweep)
+            self._deleted_lidar_sweeps[s] = deleted_sweep
 
         return self._deleted_lidar_sweeps
 
