@@ -138,10 +138,9 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         self._files = fs
         self._transforms = transforms
 
-    def get_an_image(self, index):
-        """get an image as a HxWx3 numpy array by an integer index."""
+    def _apply_transforms(self, img):
 
-        img = plt.imread(self._files[index])
+        img = img.copy()
 
         for transform, params in self._transforms:
 
@@ -161,6 +160,70 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
 
         return img
 
+    def _reverse_transforms(self, img):
+
+        img = img.copy()
+
+        figsizes = [self.original_figsize]
+
+        for method, params in self._transforms:
+
+            if method == "resize":
+                H = params["H"]
+                W = params["W"]
+                figsizes.append(np.r_[H, W])
+
+            elif method == "crop":
+                height = params["height"]
+                width = params["width"]
+                figsizes.append(np.r_[height, width])
+
+        msg = f"Expected image shape {figsizes[0]}, but got {img.shape[:2]}"
+        assert tuple(figsizes[-1]) == img.shape[:2], msg
+
+        figsizes.pop()
+
+        for method, params in self._transforms[::-1]:
+
+            if method == "resize":
+                # upsampling
+                H, W = figsizes.pop()
+                mode = Image.Resampling.BICUBIC
+                img = Image.fromarray(img).resize((W, H), mode)
+                img = np.array(img)
+
+            elif method == "crop":
+                # padding
+                top = params["top"]
+                left = params["left"]
+                height = params["height"]
+                width = params["width"]
+
+                H, W = figsizes.pop()
+                shp = (H, W) + img.shape[2:]
+
+                canvas = np.zeros(shp, dtype=img.dtype)
+                canvas[top : top + height, left : left + width] = img
+                img = canvas
+
+        return img
+
+    def get_an_image(self, index):
+        """get an image as a HxWx3 numpy array by an integer index."""
+
+        img = plt.imread(self._files[index])
+        img = self._apply_transforms(img)
+        return img
+
+    @property
+    def original_figsize(self):
+        """Return the original figure size as (height, width)."""
+
+        X = get_intrinsic_by_log_id(self.log_id)
+        index = np.searchsorted(X["sensor_name"].to_numpy(), self.camera)
+        figsize = X[["height_px", "width_px"]].to_numpy()[index]
+        return figsize
+
     @property
     def figsize(self):
         """Return the figure size as (height, width)."""
@@ -168,9 +231,7 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
         if hasattr(self, "_figsize"):
             return self._figsize
 
-        X = get_intrinsic_by_log_id(self.log_id)
-        index = np.searchsorted(X["sensor_name"].to_numpy(), self.camera)
-        figsize = X[["height_px", "width_px"]].to_numpy()[index]
+        figsize = self.original_figsize
 
         if len(self._transforms) == 0:
             self._figsize = figsize
