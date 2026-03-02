@@ -73,11 +73,11 @@ Please use the following citation for any work relies on the SceneEdited dataset
 
 
 ```
-@InProceedings{SceneEdited,
+@inproceedings{SceneEdited,
     author    = {Lin, Chun-Jung and Chin, Tat-Jun and Garg, Sourav and Dayoub, Feras},
     title     = {SceneEdited: A City-Scale Benchmark for 3D HD Map Updating via Image-Guided Change Detection},
-    booktitle = {Proceedings of the Winter Conference on Applications of Computer Vision (WACV)},
-    month     = {March},
+    booktitle = {Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision},
+    pages     = {6330--6339}
     year      = {2026}
 }
 ```
