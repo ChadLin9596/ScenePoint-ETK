@@ -5,4 +5,5 @@ from .map_updating import (
     modified_hausdorff_distance,
     median_point_distance,
     all_point_cloud_metrics,
+    voxel_classification_metrics,
 )

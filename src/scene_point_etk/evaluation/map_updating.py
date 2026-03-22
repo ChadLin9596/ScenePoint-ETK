@@ -1,6 +1,10 @@
 import numpy as np
 import scipy.spatial
 
+#####################################
+# DISTANCE METRICS FOR POINT CLOUDS #
+######################################
+
 
 def nearest_distance(point_cloud_1, point_cloud_2):
 
@@ -118,3 +122,40 @@ def all_point_cloud_metrics(point_cloud_1, point_cloud_2):
         results[key] = func(dist_pc1_to_pc2, dist_pc2_to_pc1)
 
     return results
+
+
+########################################
+# VOXEL-BASED METRICS FOR POINT CLOUDS #
+########################################
+
+
+def _voxel_confusion_matrix(pred_voxels, gt_voxels, threshold=0.1):
+
+    distances_from_pred_to_gt = nearest_distance(pred_voxels, gt_voxels)
+    distances_from_gt_to_pred = nearest_distance(gt_voxels, pred_voxels)
+
+    tp = int(np.sum(distances_from_pred_to_gt <= threshold))
+    fp = int(np.sum(distances_from_pred_to_gt > threshold))
+    fn = int(np.sum(distances_from_gt_to_pred > threshold))
+
+    return dict(tp=tp, fp=fp, fn=fn)
+
+
+def voxel_classification_metrics(pred_voxels, gt_voxels, threshold=0.1):
+
+    d = _voxel_confusion_matrix(pred_voxels, gt_voxels, threshold=threshold)
+    tp, fp, fn = d["tp"], d["fp"], d["fn"]
+
+    precision = np.nan
+    if tp + fp > 0:
+        precision = tp / (tp + fp)
+
+    recall = np.nan
+    if tp + fn > 0:
+        recall = tp / (tp + fn)
+
+    f1 = np.nan
+    if (precision + recall) > 0:
+        f1 = 2 * precision * recall / (precision + recall)
+
+    return dict(precision=precision, recall=recall, f1=f1)
