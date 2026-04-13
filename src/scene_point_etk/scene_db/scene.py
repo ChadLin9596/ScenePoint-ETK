@@ -209,6 +209,9 @@ class EditedScene(Base, EditedDetailsMixin):
     @property
     def edited_details(self):
 
+        if hasattr(self, "_edited_details"):
+            return self._edited_details
+
         _, details = diff_scene.apply_change_info_to_target_pcd(
             self._origin_scene.scene_pcd,
             self.scene_details,
