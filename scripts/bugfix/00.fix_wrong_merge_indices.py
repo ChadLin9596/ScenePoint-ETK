@@ -1,10 +1,12 @@
 import copy
+import multiprocessing as mp
 import numpy as np
 import scene_point_etk.scene_db as scene_db
 import scene_point_etk.utils as scene_utils
 
 
-def fix_a_scene_pair(scene_id, version):
+def fix_a_scene_pair(args):
+    scene_id, version = args
 
     origin_scene = scene_db.OriginalScene(scene_id)
     edited_scene = scene_db.EditedScene(scene_id, version)
@@ -46,11 +48,13 @@ def fix_a_scene_pair(scene_id, version):
     edited_scene.scene_pcd = scene_pcd_1
 
 
-def main():
+def main(num_workers=None):
 
     pairs = scene_db.list_scene_version_pairs()
-    for scene_id, version in pairs:
-        fix_a_scene_pair(scene_id, version)
+    if num_workers is None:
+        num_workers = mp.cpu_count()
+    with mp.Pool(processes=num_workers) as pool:
+        pool.map(fix_a_scene_pair, pairs)
 
 
 if __name__ == "__main__":
