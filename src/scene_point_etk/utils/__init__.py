@@ -164,7 +164,9 @@ def infer_merge_indices(scene_pcd, add_info):
         patch["z"] = z + z_offset
 
         # update the patch's center
-        patch["center"] = patch_xyz_world // voxel_size + 0.5 * voxel_size
+        xyz = np.vstack([patch["x"], patch["y"], patch["z"]]).T
+        patch["center"] = xyz // voxel_size * voxel_size
+        patch["center"] = patch["center"] + 0.5 * voxel_size
 
         _, indices = voxel_grid.unique_pcd(
             patch,

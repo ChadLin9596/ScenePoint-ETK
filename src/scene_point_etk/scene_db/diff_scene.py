@@ -151,7 +151,9 @@ def get_added_pcd(scene_pcd, add_info, return_splits=False):
         patch["z"] = z + z_offset
 
         # update the patch's center
-        patch["center"] = patch_xyz_world // voxel_size + 0.5 * voxel_size
+        xyz = np.vstack([patch["x"], patch["y"], patch["z"]]).T
+        patch["center"] = xyz // voxel_size * voxel_size
+        patch["center"] = patch["center"] + 0.5 * voxel_size
 
         # unique the patch and remove points that are already in the scene_pcd
         patch = patch[merge_ind]
