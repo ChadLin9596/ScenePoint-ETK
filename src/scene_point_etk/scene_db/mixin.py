@@ -366,6 +366,7 @@ class EditedDetailsMixin:
 
         self._deleted_indices = []
 
+        # deleted indices come from delete -> indices
         deleted_pcd = self.edited_details["deleted_points"]
         deleted_ind = self.edited_details["deleted_indices_of_target"]
 
@@ -376,6 +377,9 @@ class EditedDetailsMixin:
             for del_ind in deleted_indices:
                 del_ind = np.sort(del_ind)
                 I = np.searchsorted(deleted_ind, del_ind, side="left")
+                valid = I < len(deleted_ind)
+                I = I[valid]
+                I = I[deleted_ind[I] == del_ind[valid]]
                 M = np.ones(len(deleted_ind), dtype=bool)
                 M[I] = False
                 deleted_pcd = deleted_pcd[M]
@@ -384,6 +388,7 @@ class EditedDetailsMixin:
         if len(deleted_pcd) == 0:
             return self._deleted_indices
 
+        # deleted indices come from delete -> annotations
         deleted_det = self.scene_details["delete"]
         deleted_ann = deleted_det["annotations"]
         margin = deleted_det["margin"]
