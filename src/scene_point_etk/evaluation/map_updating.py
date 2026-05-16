@@ -8,6 +8,8 @@ import scipy.spatial
 
 def nearest_distance(point_cloud_1, point_cloud_2):
 
+    # TODO: consider using pptk.kdtree if possible (~3 times faster)
+
     tree = scipy.spatial.cKDTree(point_cloud_2)
     distances, _ = tree.query(point_cloud_1, k=1)
     return distances
@@ -86,29 +88,49 @@ def median_point_distance(point_cloud_1, point_cloud_2):
     return func(dist_pc1_to_pc2, dist_pc2_to_pc1)
 
 
-def all_point_cloud_metrics(point_cloud_1, point_cloud_2):
+def all_point_cloud_metrics(
+    point_cloud_1,
+    point_cloud_2,
+    return_details=False,
+):
     """
     Compute all distance metrics at once and return as a dictionary.
     """
 
+    details = {
+        "pts_1_to_2": np.full((len(point_cloud_1),), np.inf, dtype=np.float64),
+        "pts_2_to_1": np.full((len(point_cloud_2),), np.inf, dtype=np.float64),
+    }
+
     if len(point_cloud_1) == 0 and len(point_cloud_2) == 0:
-        return {
+
+        default = {
             "chamfer_dist": 0,
             "hausdorff_dist": 0,
             "modified_hausdorff_dist": 0,
             "median_point_dist": 0,
         }
 
+        if return_details:
+            return default, details
+        return default
+
     if len(point_cloud_1) == 0 or len(point_cloud_2) == 0:
-        return {
+        default = {
             "chamfer_dist": np.inf,
             "hausdorff_dist": np.inf,
             "modified_hausdorff_dist": np.inf,
             "median_point_dist": np.inf,
         }
+        if return_details:
+            return default, details
+        return default
 
     dist_pc1_to_pc2 = nearest_distance(point_cloud_1, point_cloud_2)
     dist_pc2_to_pc1 = nearest_distance(point_cloud_2, point_cloud_1)
+
+    details["pts_1_to_2"][:] = dist_pc1_to_pc2
+    details["pts_2_to_1"][:] = dist_pc2_to_pc1
 
     M = {
         "chamfer_dist": _chamfer_dist_by_nearest_dist,
@@ -121,6 +143,8 @@ def all_point_cloud_metrics(point_cloud_1, point_cloud_2):
     for key, func in M.items():
         results[key] = func(dist_pc1_to_pc2, dist_pc2_to_pc1)
 
+    if return_details:
+        return results, details
     return results
 
 
@@ -129,21 +153,45 @@ def all_point_cloud_metrics(point_cloud_1, point_cloud_2):
 ########################################
 
 
-def _voxel_confusion_matrix(pred_voxels, gt_voxels, threshold=0.1):
+def _voxel_confusion_matrix(
+    pred_voxels,
+    gt_voxels,
+    threshold=0.1,
+    return_details=False,
+):
 
     distances_from_pred_to_gt = nearest_distance(pred_voxels, gt_voxels)
     distances_from_gt_to_pred = nearest_distance(gt_voxels, pred_voxels)
 
-    tp = int(np.sum(distances_from_pred_to_gt <= threshold))
-    fp = int(np.sum(distances_from_pred_to_gt > threshold))
-    fn = int(np.sum(distances_from_gt_to_pred > threshold))
+    tp_voxels = pred_voxels[distances_from_pred_to_gt <= threshold]
+    fp_voxels = pred_voxels[distances_from_pred_to_gt > threshold]
+    fn_voxels = gt_voxels[distances_from_gt_to_pred > threshold]
 
-    return dict(tp=tp, fp=fp, fn=fn)
+    tp = int(len(tp_voxels))
+    fp = int(len(fp_voxels))
+    fn = int(len(fn_voxels))
+
+    results = dict(tp=tp, fp=fp, fn=fn)
+    details = dict(tp=tp_voxels, fp=fp_voxels, fn=fn_voxels)
+
+    if return_details:
+        return results, details
+    return results
 
 
-def voxel_classification_metrics(pred_voxels, gt_voxels, threshold=0.1):
+def voxel_classification_metrics(
+    pred_voxels,
+    gt_voxels,
+    threshold=0.1,
+    return_details=False,
+):
 
-    d = _voxel_confusion_matrix(pred_voxels, gt_voxels, threshold=threshold)
+    d, details = _voxel_confusion_matrix(
+        pred_voxels,
+        gt_voxels,
+        threshold=threshold,
+        return_details=True,
+    )
     tp, fp, fn = d["tp"], d["fp"], d["fn"]
 
     precision = np.nan
@@ -155,7 +203,10 @@ def voxel_classification_metrics(pred_voxels, gt_voxels, threshold=0.1):
         recall = tp / (tp + fn)
 
     f1 = np.nan
-    if (precision + recall) > 0:
-        f1 = 2 * precision * recall / (precision + recall)
+    if (tp + fp + fn) > 0:
+        f1 = 2 * tp / (2 * tp + fp + fn)
 
-    return dict(precision=precision, recall=recall, f1=f1)
+    results = dict(precision=precision, recall=recall, f1=f1)
+    if return_details:
+        return results, details
+    return results
