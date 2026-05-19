@@ -156,7 +156,7 @@ class ImageSequence(ArgoMixin, array_data.TimePoseSequence):
                 left = params["left"]
                 height = params["height"]
                 width = params["width"]
-                img = img[top : top + height, left : left + width, :]
+                img = img[top : top + height, left : left + width]
 
         return img
 
