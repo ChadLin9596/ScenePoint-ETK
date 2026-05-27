@@ -8,7 +8,6 @@ from .. import argoverse2
 def infer_ground_points_by_av2_log_id(
     log_id, points, threshold=0.1, return_indices=False
 ):
-
     assert points.ndim == 2
     assert points.shape[1] == 3
 
@@ -20,7 +19,7 @@ def infer_ground_points_by_av2_log_id(
 
     is_ground = np.logical_and(
         ~np.isnan(ground_height),
-        np.abs(ground_height - points[:, 2]) <= threshold,
+        (points[:, 2] - ground_height) <= threshold,
     )
 
     ground_points = points[is_ground]
