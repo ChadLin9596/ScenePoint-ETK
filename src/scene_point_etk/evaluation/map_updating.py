@@ -1,6 +1,13 @@
 import numpy as np
 import scipy.spatial
 
+try:
+    import pptk.kdtree
+
+    _PPTK_IS_IMPORTED = True
+except:
+    _PPTK_IS_IMPORTED = False
+
 #####################################
 # DISTANCE METRICS FOR POINT CLOUDS #
 ######################################
@@ -8,10 +15,22 @@ import scipy.spatial
 
 def nearest_distance(point_cloud_1, point_cloud_2):
 
-    # TODO: consider using pptk.kdtree if possible (~3 times faster)
+    global _PPTK_IS_IMPORTED
+    if _PPTK_IS_IMPORTED:
 
-    tree = scipy.spatial.cKDTree(point_cloud_2)
-    distances, _ = tree.query(point_cloud_1, k=1)
+        point_cloud_1 = point_cloud_1.astype(np.float64)
+        point_cloud_2 = point_cloud_2.astype(np.float64)
+
+        tree = pptk.kdtree._build(point_cloud_2)
+        Is = pptk.kdtree._query(tree, point_cloud_1, k=1)
+        I = [i[0] for i in Is]
+        distances = point_cloud_1 - point_cloud_2[I]
+        distances = np.sqrt(np.sum(distances**2, axis=-1))
+
+    else:
+        tree = scipy.spatial.cKDTree(point_cloud_2)
+        distances, _ = tree.query(point_cloud_1, k=1)
+
     return distances
 
 
