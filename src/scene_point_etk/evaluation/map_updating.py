@@ -179,8 +179,12 @@ def _voxel_confusion_matrix(
     return_details=False,
 ):
 
-    distances_from_pred_to_gt = nearest_distance(pred_voxels, gt_voxels)
-    distances_from_gt_to_pred = nearest_distance(gt_voxels, pred_voxels)
+    distances_from_pred_to_gt = np.full(len(pred_voxels), np.inf)
+    distances_from_gt_to_pred = np.full(len(gt_voxels), np.inf)
+    if len(gt_voxels) > 0:
+        distances_from_pred_to_gt = nearest_distance(pred_voxels, gt_voxels)
+    if len(pred_voxels) > 0:
+        distances_from_gt_to_pred = nearest_distance(gt_voxels, pred_voxels)
 
     tp_voxels = pred_voxels[distances_from_pred_to_gt <= threshold]
     fp_voxels = pred_voxels[distances_from_pred_to_gt > threshold]
