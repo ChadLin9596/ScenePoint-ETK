@@ -186,16 +186,28 @@ def _voxel_confusion_matrix(
     if len(pred_voxels) > 0:
         distances_from_gt_to_pred = nearest_distance(gt_voxels, pred_voxels)
 
-    tp_voxels = pred_voxels[distances_from_pred_to_gt <= threshold]
-    fp_voxels = pred_voxels[distances_from_pred_to_gt > threshold]
-    fn_voxels = gt_voxels[distances_from_gt_to_pred > threshold]
+    tp_pred_voxels = pred_voxels[distances_from_pred_to_gt <= threshold]
+    fp_pred_voxels = pred_voxels[distances_from_pred_to_gt > threshold]
+    tp_gt_voxels = gt_voxels[distances_from_gt_to_pred <= threshold]
+    fn_gt_voxels = gt_voxels[distances_from_gt_to_pred > threshold]
 
-    tp = int(len(tp_voxels))
-    fp = int(len(fp_voxels))
-    fn = int(len(fn_voxels))
+    tp_pred = int(len(tp_pred_voxels))
+    fp_pred = int(len(fp_pred_voxels))
+    tp_gt = int(len(tp_gt_voxels))
+    fn_gt = int(len(fn_gt_voxels))
 
-    results = dict(tp=tp, fp=fp, fn=fn)
-    details = dict(tp=tp_voxels, fp=fp_voxels, fn=fn_voxels)
+    results = dict(
+        tp_pred=tp_pred,
+        fp_pred=fp_pred,
+        fn_gt=fn_gt,
+        tp_gt=tp_gt,
+    )
+    details = dict(
+        tp_pred=tp_pred_voxels,
+        fp_pred=fp_pred_voxels,
+        fn_gt=fn_gt_voxels,
+        tp_gt=tp_gt_voxels,
+    )
 
     if return_details:
         return results, details
@@ -215,19 +227,14 @@ def voxel_classification_metrics(
         threshold=threshold,
         return_details=True,
     )
-    tp, fp, fn = d["tp"], d["fp"], d["fn"]
+    tp_pred = d["tp_pred"]
+    fp_pred = d["fp_pred"]
+    fn_gt = d["fn_gt"]
+    tp_gt = d["tp_gt"]
 
-    precision = np.nan
-    if tp + fp > 0:
-        precision = tp / (tp + fp)
-
-    recall = np.nan
-    if tp + fn > 0:
-        recall = tp / (tp + fn)
-
-    f1 = np.nan
-    if (tp + fp + fn) > 0:
-        f1 = 2 * tp / (2 * tp + fp + fn)
+    precision = tp_pred / (tp_pred + fp_pred + 1e-12)
+    recall = tp_gt / (tp_gt + fn_gt + 1e-12)
+    f1 = 2 * precision * recall / (precision + recall + 1e-12)
 
     results = dict(precision=precision, recall=recall, f1=f1)
     if return_details:
