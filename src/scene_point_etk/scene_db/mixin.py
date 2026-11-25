@@ -427,7 +427,7 @@ class EditedDetailsMixin:
 
             R, mean = scene_utils.modified_pcd_projection(xyz)
 
-            xyz = np.sum((xyz - mean)[:, None, :] * R, axis=-1)
+            xyz = np.sum((xyz - mean)[:, None, :] * R.T, axis=-1)
             x_min, y_min, z_min = np.min(xyz, axis=0)
             x_max, y_max, z_max = np.max(xyz, axis=0)
 
@@ -444,7 +444,7 @@ class EditedDetailsMixin:
             args = (lx, ly, lz)
             vertices = visualization_pptk.make_bounding_box_vertices(*args)
             vertices = vertices + off
-            vertices = np.sum(vertices[:, None, :] * R.T, axis=-1) + mean
+            vertices = np.sum(vertices[:, None, :] * R, axis=-1) + mean
             bounding_boxes.append(vertices)
 
         return bounding_boxes
@@ -460,7 +460,7 @@ class EditedDetailsMixin:
             xyz = np.vstack([pcds["x"], pcds["y"], pcds["z"]]).T
             R, mean = scene_utils.modified_pcd_projection(xyz)
 
-            xyz = np.sum((xyz - mean)[:, None, :] * R, axis=-1)
+            xyz = np.sum((xyz - mean)[:, None, :] * R.T, axis=-1)
             x_min, y_min, z_min = np.min(xyz, axis=0)
             x_max, y_max, z_max = np.max(xyz, axis=0)
 
@@ -477,7 +477,7 @@ class EditedDetailsMixin:
             args = (lx, ly, lz)
             vertices = visualization_pptk.make_bounding_box_vertices(*args)
             vertices = vertices + off
-            vertices = np.sum(vertices[:, None, :] * R.T, axis=-1) + mean
+            vertices = np.sum(vertices[:, None, :] * R, axis=-1) + mean
             bounding_boxes.append(vertices)
 
         return bounding_boxes

@@ -142,7 +142,7 @@ def get_added_pcd(scene_pcd, add_info, return_splits=False):
         # align the lowest point of the patch to the anchor_xyz
         i = np.argmin(patch_xyz[:, 2])
         pos_diff = anchor_xyz - patch_xyz[i]
-        patch_xyz_world = patch_xyz @ anchor_R + pos_diff
+        patch_xyz_world = patch_xyz @ anchor_R.T + pos_diff
 
         # updated the patch coordinates to world coordinates
         x, y, z = patch_xyz_world.T
